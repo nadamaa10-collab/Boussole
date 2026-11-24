@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 247 243 236;
+  --foreground: 31 42 46;
+  --card: 255 253 249;
+  --muted: 238 232 222;
+  --muted-foreground: 101 108 107;
+  --border: 224 216 203;
+  --primary: 31 95 91;
+  --primary-foreground: 255 255 255;
+  --secondary: 236 229 216;
+  --accent: 232 163 61;
+  --accent-foreground: 31 30 25;
+  --ink: 20 32 31;
+  --ink-foreground: 245 241 232;
+  --ink-muted: 160 172 168;
+  --ink-soft: 34 50 48;
+  --danger: 196 64 44;
+  --warning: 205 133 20;
+  --success: 46 125 80;
+}
+
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body { @apply bg-background font-sans text-foreground antialiased; }
+.font-num { font-variant-numeric: tabular-nums; }
+
+.paper-grain {
+  background-image: radial-gradient(rgb(var(--foreground) / 0.035) 1px, transparent 1px);
+  background-size: 4px 4px;
+}
+
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.animate-rise { animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+@keyframes sheet { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.animate-sheet { animation: sheet 0.22s ease-out both; }
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

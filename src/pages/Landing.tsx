@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
   ArrowRight,
@@ -28,24 +27,6 @@ import {
   endOfMonth,
   monthKey,
 } from "@/lib/finance";
-
-const TITLE = "Boussole — le pilotage financier des freelances et petites entreprises";
-const DESCRIPTION =
-  "Argent disponible, trésorerie jour par jour, factures à encaisser et rentabilité réelle : comprenez où va votre argent et anticipez ce qui vous attend. Dans votre devise.";
-
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: TITLE },
-      { name: "description", content: DESCRIPTION },
-      { property: "og:title", content: TITLE },
-      { property: "og:description", content: DESCRIPTION },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
-  component: Index,
-});
 
 /** Les trois bénéfices du positionnement. */
 const BENEFITS = [
@@ -124,7 +105,7 @@ function useHeroPreview() {
   }, []);
 }
 
-function Index() {
+export function Landing() {
   const hero = useHeroPreview();
 
   return (
@@ -190,16 +171,16 @@ function Index() {
                 </div>
               </div>
               <p className="mt-5 text-xs text-ink-muted">Solde prévu sur 30 jours</p>
-              <div className="mt-2 flex h-20 items-end gap-1.5" aria-hidden="true">
+              {hero.min && hero.min.balance < 0 && (
+                <p className="mt-1 text-xs text-ink-muted">
+                  Point bas : <span className="font-semibold text-ink-foreground">{hero.fmt(hero.min.balance)}</span> le {formatDateFr(hero.min.date)}, alors que le mois est rentable.
+                </p>
+              )}
+              <div className="mt-3 flex h-20 items-end gap-1.5" aria-hidden="true">
                 {hero.bars.map((b) => (
                   <div key={b.date} className={`flex-1 rounded-t-md ${b.neg ? "bg-danger" : "bg-accent/80"}`} style={{ height: `${Math.max(6, b.h)}%` }} />
                 ))}
               </div>
-              {hero.min && hero.min.balance < 0 && (
-                <p className="mt-3 text-xs text-ink-muted">
-                  Point bas : <span className="font-semibold text-ink-foreground">{hero.fmt(hero.min.balance)}</span> le {formatDateFr(hero.min.date)}, alors que le mois est rentable.
-                </p>
-              )}
             </div>
             {hero.late && (
               <div className="absolute -bottom-6 -left-4 -rotate-2 rounded-2xl border border-border bg-card p-4 shadow-soft md:-left-10">

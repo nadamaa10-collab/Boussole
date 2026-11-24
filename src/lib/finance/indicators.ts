@@ -239,7 +239,7 @@ export function priorityActions(data: FinanceData, today: ISODate, limit = 6): P
         severity: b.level === "depasse" ? 2 : 3,
         impact: Math.max(0, -b.remaining),
         kind: "budget",
-        title: `Budget « ${b.category} » ${b.level === "depasse" ? "dépassé" : "presque atteint"}`,
+        title: `Budget « ${b.category} » ${b.level === "depasse" ? "dépassé" : b.percent >= 100 ? "atteint" : "presque atteint"}`,
         detail: `${b.percent} % consommé (${fmt(b.engaged)} sur ${fmt(b.budget)})`,
       });
     }

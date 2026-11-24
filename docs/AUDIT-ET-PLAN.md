@@ -1,5 +1,7 @@
 # Boussole : audit et plan de refonte
 
+> **Mise à jour :** Boussole ne dépend plus de Lovable. La démo a été reconstruite comme une application indépendante (Vite + React), branchée sur le moteur ci-dessous. Les sections 4 et 5 sont remplacées par la feuille de route de la démo en fin de document.
+
 ## 1. Ce qui a été audité
 
 Je n'ai reçu qu'un seul fichier de l'application Lovable : la page d'accueil `src/routes/index.tsx`. Les fichiers suivants **n'ont pas été transmis**, donc ils n'ont pas pu être audités :
@@ -98,3 +100,18 @@ Elle n'a pas encore été vérifiée dans le projet Lovable (voir la section 5).
 
 1. **Tout le projet Lovable.** Dans Lovable, menu GitHub puis « Connect to GitHub » : Lovable pousse le projet complet dans un dépôt. Donnez-moi ensuite le nom de ce dépôt (ou copiez son contenu dans `nadamaa10-collab/Boussole`).
 2. **Une confirmation** que l'application ne stocke aujourd'hui aucune donnée d'utilisateur réel (démo seule), ou l'emplacement de ce stockage.
+
+## 6. Démo indépendante (livrée)
+
+La démo couvre :
+- **Accueil** en 4 blocs : argent disponible, ce qui m'attend, à faire en priorité, ce que l'activité gagne.
+- **Trésorerie** : graphique jour par jour (7 / 30 / 90 jours / personnalisé), scénarios standard et prudent, simulations (retard client, dépense exceptionnelle, nouveau contrat, baisse des encaissements, taux de change).
+- **Factures** : paiements partiels, modification de l'échéance et de la fiabilité.
+- **Rentabilité** : mois par mois, avec les repères de dirigeant.
+- **Budgets** (seuils réglables), **Récurrences** (confirmation, modification ponctuelle) et **Journal** (recherche, filtres, export CSV).
+- Bouton « + Ajouter » avec 5 opérations, choix de la devise de pilotage, navigation mobile en barre du bas.
+
+Prochaines étapes, après tes retours sur la démo :
+1. ajuster textes, chiffres et parcours ;
+2. compte utilisateur et sauvegarde des données (plateforme réelle) ;
+3. import CSV bancaire, justificatifs, source officielle de taux de change.
