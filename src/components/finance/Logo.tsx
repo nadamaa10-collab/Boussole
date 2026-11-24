@@ -1,6 +1,6 @@
-export function Logo({ className = "" }: { className?: string }) {
+export function Logo({ className = "", href = "#" }: { className?: string; href?: string }) {
   return (
-    <a href="#" className={`inline-flex items-center gap-2 font-display text-xl tracking-tight ${className}`} aria-label="Boussole, accueil">
+    <a href={href} className={`inline-flex items-center gap-2 font-display text-xl tracking-tight ${className}`} aria-label="Boussole, accueil">
       <svg viewBox="0 0 32 32" className="size-7" aria-hidden="true">
         <circle cx="16" cy="16" r="15" className="fill-primary" />
         <circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" strokeOpacity=".25" className="text-primary-foreground" />

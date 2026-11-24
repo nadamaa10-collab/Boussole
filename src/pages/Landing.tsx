@@ -13,7 +13,6 @@ import {
   Scale,
   X,
 } from "lucide-react";
-import { DemoApp } from "@/components/finance/DemoApp";
 import { Logo } from "@/components/finance/Logo";
 import {
   buildDemoData,
@@ -118,8 +117,8 @@ export function Landing() {
             <a href="#benefices" className="hidden rounded-full px-3 py-2 text-muted-foreground hover:text-foreground md:inline">Pourquoi Boussole</a>
             <a href="#fonctionnalites" className="hidden rounded-full px-3 py-2 text-muted-foreground hover:text-foreground md:inline">Fonctionnalités</a>
             <a href="#limites" className="hidden rounded-full px-3 py-2 text-muted-foreground hover:text-foreground lg:inline">Ce qu'il ne fait pas</a>
-            <a href="#demo" className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90">
-              Essayer la démo <ArrowRight className="size-4" />
+            <a href="#app" className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-primary/90">
+              Ouvrir l'application <ArrowRight className="size-4" />
             </a>
           </nav>
         </div>
@@ -146,8 +145,8 @@ export function Landing() {
               L'outil qui vous aide à comprendre où va votre argent et à anticiper ce qui vous attend. Chaque matin : ce que vous avez, ce qui va entrer, ce qui va sortir, ce que votre activité gagne et ce qu'il faut surveiller.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a href="#demo" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5">
-                Essayer la démo <ArrowRight className="size-4" />
+              <a href="#app" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5">
+                Ouvrir l'application <ArrowRight className="size-4" />
               </a>
               <a href="#benefices" className="rounded-full px-5 py-3 font-semibold text-foreground hover:bg-muted">Voir ce qu'il fait</a>
             </div>
@@ -243,17 +242,17 @@ export function Landing() {
         </div>
       </section>
 
-      {/* Démo */}
-      <section id="demo" className="scroll-mt-16 bg-[linear-gradient(to_bottom,var(--background),var(--secondary))]">
-        <div className="mx-auto max-w-6xl px-3 py-20 sm:px-5">
-          <div className="mx-auto mb-10 max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Démo interactive</p>
-            <h2 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">Essayez avec vos propres chiffres.</h2>
-            <p className="mt-4 text-muted-foreground">
-              Choisissez votre devise, indiquez vos comptes, ajoutez une facture ou une dépense : la trésorerie et la rentabilité se calculent sous vos yeux. Vos données restent sur votre appareil, rien n'est envoyé.
-            </p>
-          </div>
-          <DemoApp />
+      {/* Accès à l'application */}
+      <section className="bg-[linear-gradient(to_bottom,var(--background),var(--secondary))]">
+        <div className="mx-auto max-w-3xl px-5 py-20 text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Essayez-la</p>
+          <h2 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">Testez avec vos propres chiffres.</h2>
+          <p className="mt-4 text-muted-foreground">
+            Choisissez votre devise, indiquez vos comptes, ajoutez une facture ou une dépense : la trésorerie et la rentabilité se calculent sous vos yeux. Un guide animé vous montre où saisir chaque information.
+          </p>
+          <a href="#app" className="mt-8 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground shadow-soft transition-transform hover:-translate-y-0.5">
+            Ouvrir l'application <ArrowRight className="size-4" />
+          </a>
         </div>
       </section>
 
@@ -308,9 +307,9 @@ export function Landing() {
           <div className="pointer-events-none absolute -bottom-32 -right-20 size-96 rounded-full bg-accent/25 blur-3xl" />
           <div className="relative max-w-2xl">
             <h2 className="font-display text-4xl tracking-tight md:text-5xl">Arrêtez de deviner. Commencez à anticiper.</h2>
-            <p className="mt-4 text-lg text-ink-muted">Cinq minutes avec la démo suffisent pour voir ce qu'un tableur ne vous montre pas : le jour où l'argent manque, et pourquoi.</p>
-            <a href="#demo" className="mt-8 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-semibold text-accent-foreground transition-transform hover:-translate-y-0.5">
-              Ouvrir la démo <ArrowRight className="size-4" />
+            <p className="mt-4 text-lg text-ink-muted">Cinq minutes avec l'application suffisent pour voir ce qu'un tableur ne vous montre pas : le jour où l'argent manque, et pourquoi.</p>
+            <a href="#app" className="mt-8 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 font-semibold text-accent-foreground transition-transform hover:-translate-y-0.5">
+              Ouvrir l'application <ArrowRight className="size-4" />
             </a>
           </div>
         </div>
