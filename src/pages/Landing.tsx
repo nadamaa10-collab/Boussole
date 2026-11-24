@@ -248,9 +248,9 @@ export function Landing() {
         <div className="mx-auto max-w-6xl px-3 py-20 sm:px-5">
           <div className="mx-auto mb-10 max-w-2xl text-center">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Démo interactive</p>
-            <h2 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">Essayez avec un vrai atelier.</h2>
+            <h2 className="mt-3 font-display text-4xl tracking-tight md:text-5xl">Essayez avec vos propres chiffres.</h2>
             <p className="mt-4 text-muted-foreground">
-              Enregistrez un paiement partiel, décalez une échéance, changez de devise : la trésorerie et la rentabilité se recalculent sous vos yeux. Données fictives, rien n'est enregistré.
+              Choisissez votre devise, indiquez vos comptes, ajoutez une facture ou une dépense : la trésorerie et la rentabilité se calculent sous vos yeux. Vos données restent sur votre appareil, rien n'est envoyé.
             </p>
           </div>
           <DemoApp />

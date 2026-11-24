@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Search } from "lucide-react";
+import { Download, Plus, Search, Trash2 } from "lucide-react";
 import {
   addDays,
   budgetStatus,
@@ -9,6 +9,8 @@ import {
   monthKey,
   occurrences,
   overrideOccurrence,
+  findRate,
+  type Frequency,
   type Recurrence,
 } from "@/lib/finance";
 import type { Demo } from "./store";
@@ -21,11 +23,25 @@ export function BudgetsTab({ demo }: { demo: Demo }) {
   const { data, fmt, base, actions } = demo;
   const rows = budgetStatus(data, monthKey(TODAY));
   const { warning, over } = data.settings.budgetThresholds;
+  const [cat, setCat] = useState("");
+  const [amt, setAmt] = useState(0);
+  const known = [...new Set([...data.invoices.filter((i) => i.kind === "fournisseur").map((i) => i.category), ...data.recurrences.filter((r) => r.kind === "depense").map((r) => r.category)])].filter((c) => !data.budgets.some((b) => b.category === c));
   return (
     <div className="space-y-4">
+      <Card title="Ajouter un budget mensuel">
+        <div className="flex flex-wrap gap-2">
+          <input className={`${inputCls} min-w-[160px] flex-1`} list="budget-cats" placeholder="Catégorie (ex. Logiciels)" value={cat} onChange={(e) => setCat(e.target.value)} />
+          <datalist id="budget-cats">{known.map((c) => <option key={c} value={c} />)}</datalist>
+          <input type="number" min={0} className={`${inputCls} w-36`} placeholder={`Montant (${base})`} value={amt || ""} onChange={(e) => setAmt(Number(e.target.value))} />
+          <button disabled={!cat.trim() || !(amt > 0)} onClick={() => { actions.upsertBudget({ category: cat.trim(), monthly: amt }); setCat(""); setAmt(0); }} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50">
+            <Plus className="size-4" /> Ajouter
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">Utilisez le même nom de catégorie que dans vos dépenses pour que le suivi se fasse automatiquement.</p>
+      </Card>
       <Card title="Budgets du mois" help="Engagé = dépenses rattachées au mois, payées ou non. Payé = ce qui est déjà sorti du compte.">
         {rows.length === 0 ? (
-          <Empty>Ajoutez votre premier budget pour suivre vos dépenses.</Empty>
+          <Empty>Ajoutez votre premier budget ci-dessus pour suivre vos dépenses.</Empty>
         ) : (
           <ul className="space-y-5">
             {rows.map((b) => {
@@ -46,7 +62,8 @@ export function BudgetsTab({ demo }: { demo: Demo }) {
                     <span>Engagé {fmt(b.engaged)} · payé {fmt(b.paid)} · {b.remaining >= 0 ? `reste ${fmt(b.remaining)}` : `dépassement ${fmt(-b.remaining)}`}</span>
                     <label className="flex items-center gap-1">
                       Budget
-                      <input type="number" min={0} className="w-24 rounded-lg border border-border bg-card px-2 py-1 text-right text-sm" value={b.budget} onChange={(e) => actions.setBudget(b.category, Math.max(0, Number(e.target.value)))} aria-label={`Budget ${b.category} en ${base}`} />
+                      <input type="number" min={0} className="w-24 rounded-lg border border-border bg-card px-2 py-1 text-right text-sm" value={b.budget} onChange={(e) => actions.upsertBudget({ category: b.category, monthly: Math.max(0, Number(e.target.value)) })} aria-label={`Budget ${b.category} en ${base}`} />
+                      <button onClick={() => actions.deleteBudget(b.category)} aria-label={`Supprimer le budget ${b.category}`} className="p-1"><Trash2 className="size-3.5" /></button>
                     </label>
                   </div>
                 </li>
@@ -75,14 +92,22 @@ export function RecurrencesTab({ demo }: { demo: Demo }) {
   const { data, fmt, actions } = demo;
   const [edit, setEdit] = useState<{ r: Recurrence; key: string; amount: number; date: string } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <button onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="size-4" /> Nouvelle échéance récurrente</button>
+      </div>
+      {data.recurrences.length === 0 && <Empty>Ajoutez votre loyer, vos abonnements ou votre assurance : ils seront prévus automatiquement dans votre trésorerie.</Empty>}
+      <Sheet open={adding} onClose={() => setAdding(false)} title="Échéance récurrente">
+        {adding && <RecurrenceForm demo={demo} done={() => setAdding(false)} />}
+      </Sheet>
       <p className="text-sm text-muted-foreground">Les prochaines échéances alimentent automatiquement vos prévisions. Elles ne sont considérées comme payées qu'une fois confirmées.</p>
       {data.recurrences.map((r) => {
         const next = occurrences(data, r, addDays(TODAY, -60), addDays(TODAY, 100)).filter((o) => !o.confirmed || o.date >= addDays(TODAY, -7)).slice(0, 4);
         return (
-          <Card key={r.id} title={<>{r.label} {r.essential && <Badge>incompressible</Badge>}</>}>
+          <Card key={r.id} title={<>{r.label} {r.essential && <Badge>incompressible</Badge>}</>} action={<button onClick={() => actions.deleteRecurrence(r.id)} aria-label={`Supprimer ${r.label}`} className="p-1 text-muted-foreground"><Trash2 className="size-4" /></button>}>
             <p className="text-sm text-muted-foreground">{fmt(r.amount, r.currency)} · {r.frequency} · {r.category}</p>
             <ul className="mt-2 divide-y divide-border">
               {next.map((o) => (
@@ -126,6 +151,67 @@ export function RecurrencesTab({ demo }: { demo: Demo }) {
           </div>
         )}
       </Sheet>
+    </div>
+  );
+}
+
+function RecurrenceForm({ demo, done }: { demo: Demo; done: () => void }) {
+  const { data, base, actions } = demo;
+  const [f, setF] = useState({ kind: "depense" as Recurrence["kind"], label: "", amount: 0, frequency: "mensuelle" as Frequency, startDate: addDays(TODAY, 1), category: "", essential: true, accountId: data.accounts[0]!.id, endDate: "" });
+  const [errors, setErrors] = useState<string[]>([]);
+  const account = data.accounts.find((a) => a.id === f.accountId)!;
+  const set = (p: Partial<typeof f>) => setF({ ...f, ...p });
+  const noRate = account.currency !== base && !findRate(data.rates, account.currency, base, TODAY);
+  const submit = () => {
+    const errs = actions.addRecurrence({
+      id: newId("r"),
+      kind: f.kind,
+      label: f.label.trim(),
+      category: f.category.trim() || f.label.trim(),
+      nature: "exploitation",
+      amount: f.amount,
+      currency: account.currency,
+      frequency: f.frequency,
+      startDate: f.startDate,
+      endDate: f.endDate || undefined,
+      accountId: f.accountId,
+      essential: f.kind === "depense" && f.essential,
+    });
+    setErrors(errs);
+    if (!errs.length) done();
+  };
+  return (
+    <div className="space-y-3">
+      <Segmented label="Type" value={f.kind} onChange={(kind) => set({ kind })} options={[{ value: "depense", label: "Dépense" }, { value: "recette", label: "Recette" }]} />
+      <Field label="Nom"><input autoFocus className={inputCls} value={f.label} onChange={(e) => set({ label: e.target.value })} placeholder={f.kind === "depense" ? "Ex. Loyer du bureau" : "Ex. Forfait mensuel client"} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label={`Montant (${account.currency})`}><input type="number" inputMode="decimal" min={0} className={inputCls} value={f.amount || ""} onChange={(e) => set({ amount: Number(e.target.value) })} /></Field>
+        <Field label="Fréquence">
+          <select className={inputCls} value={f.frequency} onChange={(e) => set({ frequency: e.target.value as Frequency })}>
+            <option value="hebdomadaire">Chaque semaine</option>
+            <option value="mensuelle">Chaque mois</option>
+            <option value="trimestrielle">Chaque trimestre</option>
+            <option value="annuelle">Chaque année</option>
+          </select>
+        </Field>
+        <Field label="Prochaine échéance"><input type="date" className={inputCls} value={f.startDate} onChange={(e) => set({ startDate: e.target.value })} /></Field>
+        <Field label="Fin (facultatif)"><input type="date" className={inputCls} value={f.endDate} onChange={(e) => set({ endDate: e.target.value })} /></Field>
+      </div>
+      <Field label="Catégorie" hint="Sert aux budgets. Par défaut, le nom."><input className={inputCls} value={f.category} onChange={(e) => set({ category: e.target.value })} /></Field>
+      <Field label="Compte">
+        <select className={inputCls} value={f.accountId} onChange={(e) => set({ accountId: e.target.value })}>
+          {data.accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+        </select>
+      </Field>
+      {f.kind === "depense" && (
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={f.essential} onChange={(e) => set({ essential: e.target.checked })} />
+          <span>Charge incompressible <span className="block text-xs text-muted-foreground">À payer même sans aucune vente (loyer, assurance…). Sert à calculer combien de temps vous tenez.</span></span>
+        </label>
+      )}
+      {noRate && <p className="text-xs text-danger">Aucun taux {account.currency} → {base} : ajoutez-le dans les paramètres pour l'inclure dans les totaux.</p>}
+      <Errors list={errors} />
+      <PrimaryButton onClick={submit}>Ajouter</PrimaryButton>
     </div>
   );
 }

@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { BookOpen, ChartLine, FileText, Home, LayoutGrid, PiggyBank, Plus, Repeat, RotateCcw, Scale } from "lucide-react";
-import { formatDateFr } from "@/lib/finance";
-import { useDemo, TODAY } from "@/components/demo/store";
+import { BookOpen, ChartLine, FileText, Home, LayoutGrid, PiggyBank, Plus, Repeat, Scale, Settings } from "lucide-react";
+import { formatDateFr, type FinanceData } from "@/lib/finance";
+import { useDemo, useDemoRoot, TODAY } from "@/components/demo/store";
+import { SetupScreen } from "@/components/demo/SetupScreen";
+import { SettingsSheet } from "@/components/demo/SettingsSheet";
 import { HomeTab } from "@/components/demo/HomeTab";
 import { TresorerieTab } from "@/components/demo/TresorerieTab";
 import { FacturesTab } from "@/components/demo/FacturesTab";
@@ -24,7 +26,20 @@ type TabId = (typeof TABS)[number]["id"];
 const MOBILE_MAIN: TabId[] = ["accueil", "tresorerie", "factures", "rentabilite"];
 
 export function DemoApp() {
-  const demo = useDemo();
+  const root = useDemoRoot();
+  if (!root.data) {
+    return (
+      <div id="demo-app" className="scroll-mt-20 rounded-3xl border border-border bg-background shadow-float">
+        <SetupScreen onStart={root.start} onExample={root.loadExample} />
+      </div>
+    );
+  }
+  return <Workspace data={root.data} setData={root.setData} clear={root.clear} />;
+}
+
+function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: FinanceData) => void; clear: () => void }) {
+  const demo = useDemo(data, setData, clear);
+  const [settings, setSettings] = useState(false);
   const [tab, setTab] = useState<TabId>("accueil");
   const [adding, setAdding] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -43,14 +58,21 @@ export function DemoApp() {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-6">
         <div>
           <p className="font-display text-lg leading-tight">{demo.data.settings.companyName}</p>
-          <p className="text-xs text-muted-foreground">Aujourd'hui, {formatDateFr(TODAY)} · données fictives, rien n'est enregistré</p>
+          <p className="text-xs text-muted-foreground">
+            Aujourd'hui, {formatDateFr(TODAY)} ·{" "}
+            {demo.data.demo ? (
+              <>exemple fictif · <button onClick={clear} className="font-semibold text-primary">repartir de zéro</button></>
+            ) : (
+              "données gardées sur cet appareil uniquement"
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setPicking(true)} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold hover:bg-muted" aria-label={`Devise de pilotage : ${demo.base}. Changer`}>
             {demo.base} ▾
           </button>
-          <button onClick={demo.actions.reset} className="rounded-full p-2 text-muted-foreground hover:bg-muted" aria-label="Réinitialiser la démo" title="Réinitialiser la démo">
-            <RotateCcw className="size-4" />
+          <button onClick={() => setSettings(true)} className="rounded-full p-2 text-muted-foreground hover:bg-muted" aria-label="Paramètres" title="Paramètres">
+            <Settings className="size-4" />
           </button>
           <button onClick={() => setAdding(true)} className="hidden items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 md:inline-flex">
             <Plus className="size-4" /> Ajouter
@@ -74,7 +96,7 @@ export function DemoApp() {
 
       <div className="min-h-[560px] p-3 pb-8 sm:p-6">
         <h2 className="mb-4 font-display text-2xl md:hidden">{current.label}</h2>
-        {tab === "accueil" && <HomeTab demo={demo} goTo={go} />}
+        {tab === "accueil" && <HomeTab demo={demo} goTo={go} onAdd={() => setAdding(true)} />}
         {tab === "tresorerie" && <TresorerieTab demo={demo} />}
         {tab === "factures" && <FacturesTab demo={demo} />}
         {tab === "rentabilite" && <RentabiliteTab demo={demo} />}
@@ -111,6 +133,7 @@ export function DemoApp() {
 
       <AddSheet demo={demo} open={adding} onClose={() => setAdding(false)} />
       <CurrencyPicker demo={demo} open={picking} onClose={() => setPicking(false)} />
+      <SettingsSheet demo={demo} open={settings} onClose={() => setSettings(false)} />
 
       {/* Notifications */}
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-28 z-[60] flex flex-col items-center gap-2 px-4 md:bottom-6">

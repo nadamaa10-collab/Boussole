@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, FilePlus2, Receipt } from "lucide-react";
-import { addDays, invoiceState, type Invoice } from "@/lib/finance";
-import { DEMO_CURRENCIES } from "@/lib/finance";
+import { CURRENCIES, addDays, findRate, invoiceState, type Invoice } from "@/lib/finance";
 import type { Demo } from "./store";
 import { TODAY, newId } from "./store";
 import { Errors, Field, PrimaryButton, Sheet, inputCls } from "./ui";
@@ -76,14 +75,21 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
     months: 36,
     spread: false,
     periodEnd: addDays(TODAY, 89),
+    rate: 0,
   });
   const [advanced, setAdvanced] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const set = (p: Partial<typeof f>) => setF({ ...f, ...p });
   const categories = [...new Set(data.invoices.filter((i) => i.kind === kind).map((i) => i.category).concat(data.budgets.map((b) => b.category)))];
   const account = data.accounts.find((a) => a.id === f.accountId)!;
+  const knownRate = f.currency === base ? null : findRate(data.rates, f.currency, base, f.issueDate);
+  const needsRate = f.currency !== base && !knownRate;
 
   const submit = () => {
+    if (needsRate && !(f.rate > 0)) {
+      setErrors([`Indiquez le taux ${f.currency} → ${base} à la date de la facture.`]);
+      return;
+    }
     const inv: Invoice = {
       id: newId(client ? "f" : "a"),
       kind,
@@ -100,12 +106,14 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
       expectedPaymentDate: f.expected || undefined,
       confidence: client ? f.confidence : undefined,
       servicePeriod: client && f.spread ? { start: f.issueDate, end: f.periodEnd } : undefined,
+      economicRate: needsRate ? { rate: f.rate, date: f.issueDate, source: "Saisie manuelle", base } : undefined,
     };
     if (f.paid && account.currency !== f.currency) {
       setErrors(["Pour un paiement immédiat, choisissez un compte dans la devise de la facture, ou enregistrez le paiement ensuite depuis la facture."]);
       return;
     }
-    const errs = actions.addInvoice(inv, f.paid ? { accountId: f.accountId, amount: f.amount + f.vat } : undefined);
+    const rates = needsRate ? [{ from: f.currency, to: base, rate: f.rate, date: f.issueDate, source: "Saisie manuelle" }] : [];
+    const errs = actions.addInvoice(inv, f.paid ? { accountId: f.accountId, amount: f.amount + f.vat } : undefined, rates);
     setErrors(errs);
     if (!errs.length) done();
   };
@@ -121,7 +129,7 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
         </Field>
         <Field label="Devise">
           <select className={inputCls} value={f.currency} onChange={(e) => set({ currency: e.target.value })}>
-            {DEMO_CURRENCIES.map((c) => <option key={c}>{c}</option>)}
+            {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
           </select>
         </Field>
       </div>
@@ -140,7 +148,12 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
           </select>
         )}
       </label>
-      {f.currency !== base && <p className="text-xs text-muted-foreground">La valeur en {base} sera calculée au taux du jour de la facture (taux de démonstration fictif) et figée pour la rentabilité.</p>}
+      {needsRate && (
+        <Field label={`1 ${f.currency} = combien de ${base} ?`} hint="Taux du jour de la facture. Il sera figé pour calculer votre rentabilité.">
+          <input type="number" step="0.0001" min={0} className={inputCls} value={f.rate || ""} onChange={(e) => set({ rate: Number(e.target.value) })} />
+        </Field>
+      )}
+      {knownRate && <p className="text-xs text-muted-foreground">Valeur en {base} calculée avec le taux connu : 1 {f.currency} = {knownRate.rate.toFixed(4)} {base} ({knownRate.source}).</p>}
 
       <button type="button" className="text-sm font-semibold text-primary" onClick={() => setAdvanced((a) => !a)} aria-expanded={advanced}>
         {advanced ? "Masquer les options" : "Plus d'options (catégorie, TVA, date estimée…)"}

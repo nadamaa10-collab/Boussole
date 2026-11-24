@@ -23,7 +23,7 @@ const ICONS = {
   depense_inhabituelle: AlertTriangle,
 };
 
-export function HomeTab({ demo, goTo }: { demo: Demo; goTo: (tab: string) => void }) {
+export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string) => void; onAdd: () => void }) {
   const { data, fmt, base } = demo;
   const pos = cashPosition(data, TODAY);
   const { receivables, payables } = commitments(data, TODAY);
@@ -35,8 +35,30 @@ export function HomeTab({ demo, goTo }: { demo: Demo; goTo: (tab: string) => voi
   const upcoming = f30.events.slice(0, 5);
   const monthName = new Intl.DateTimeFormat("fr-FR", { month: "long" }).format(new Date(TODAY));
 
+  const isEmpty = data.invoices.length === 0 && data.recurrences.length === 0 && data.movements.length === 0;
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {isEmpty && (
+        <Card title="Pour bien démarrer" className="border-primary/30 bg-primary/5 lg:col-span-2">
+          <ol className="grid gap-2 sm:grid-cols-3">
+            {[
+              { n: 1, t: "Vos factures clients en attente", d: "Ce qu'on vous doit, avec la date prévue de paiement.", a: onAdd },
+              { n: 2, t: "Vos dépenses à venir", d: "Factures fournisseurs non payées.", a: onAdd },
+              { n: 3, t: "Vos charges récurrentes", d: "Loyer, abonnements, assurance…", a: () => goTo("recurrences") },
+            ].map((x) => (
+              <li key={x.n}>
+                <button onClick={x.a} className="h-full w-full rounded-xl bg-card p-3 text-left hover:ring-2 hover:ring-primary/30">
+                  <span className="font-num text-2xl text-accent">{x.n}</span>
+                  <span className="block font-semibold">{x.t}</span>
+                  <span className="text-sm text-muted-foreground">{x.d}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-3 text-sm text-muted-foreground">Dès la première ligne, vos prévisions de trésorerie et votre rentabilité se calculent toutes seules.</p>
+        </Card>
+      )}
       {/* 1. Argent disponible */}
       <Card
         title={<><Wallet className="size-4" /> Mon argent disponible aujourd'hui</>}

@@ -4,6 +4,7 @@ import {
   applyBaseCurrencyChange,
   breakEven,
   buildDemoData,
+  buildEmptyData,
   cashFlowStatement,
   cashPosition,
   commitments,
@@ -399,5 +400,19 @@ describe("Démo", () => {
     const mad = applyBaseCurrencyChange(demo, preview, true);
     const eur = cashPosition(demo, T).total!;
     expect(cashPosition(mad, T).total).toBeCloseTo(eur * 10.8, 0);
+  });
+});
+
+describe("Démarrage à vide", () => {
+  it("ne contient aucune donnée fictive et calcule dès le premier compte", () => {
+    const data = buildEmptyData(
+      { companyName: "Studio", baseCurrency: "MAD", vatRegistered: false, accounts: [{ name: "Banque", kind: "banque", currency: "MAD", balance: 12000 }, { name: "Compte EUR", kind: "banque", currency: "EUR", balance: 100 }], rates: { EUR: 10.8 } },
+      T,
+    );
+    expect([data.invoices, data.payments, data.recurrences, data.budgets, data.settings.levies]).toEqual([[], [], [], [], []]);
+    expect(data.demo).toBeUndefined();
+    expect(cashPosition(data, T).total).toBe(13080);
+    expect(forecast(data, { today: T, days: 30 }).end).toBe(13080);
+    expect(profitability(data, month.from, month.to).resultLabel).toBe("Résultat estimé avant prélèvements");
   });
 });

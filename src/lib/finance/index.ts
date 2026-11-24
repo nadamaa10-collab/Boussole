@@ -17,3 +17,4 @@ export * from "./profitability";
 export * from "./indicators";
 export * from "./base-currency";
 export * from "./demo-data";
+export * from "./setup";
