@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download, Plus, Search, Trash2 } from "lucide-react";
+import { Download, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import {
   addDays,
   budgetStatus,
@@ -94,6 +94,7 @@ export function RecurrencesTab({ demo }: { demo: Demo }) {
   const [edit, setEdit] = useState<{ r: Recurrence; key: string; amount: number; date: string } | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Recurrence | null>(null);
 
   return (
     <div className="space-y-4">
@@ -104,11 +105,19 @@ export function RecurrencesTab({ demo }: { demo: Demo }) {
       <Sheet open={adding} onClose={() => setAdding(false)} title="Échéance récurrente">
         {adding && <RecurrenceForm demo={demo} done={() => setAdding(false)} />}
       </Sheet>
+      <Sheet open={!!editing} onClose={() => setEditing(null)} title="Modifier l'échéance récurrente">
+        {editing && <RecurrenceForm key={editing.id} demo={demo} initial={editing} done={() => setEditing(null)} />}
+      </Sheet>
       <p className="text-sm text-muted-foreground">Les prochaines échéances alimentent automatiquement vos prévisions. Elles ne sont considérées comme payées qu'une fois confirmées.</p>
       {data.recurrences.map((r) => {
         const next = occurrences(data, r, addDays(TODAY, -60), addDays(TODAY, 100)).filter((o) => !o.confirmed || o.date >= addDays(TODAY, -7)).slice(0, 4);
         return (
-          <Card key={r.id} title={<>{r.label} {r.essential && <Badge>incompressible</Badge>}</>} action={<button onClick={() => actions.deleteRecurrence(r.id)} aria-label={`Supprimer ${r.label}`} className="p-1 text-muted-foreground"><Trash2 className="size-4" /></button>}>
+          <Card key={r.id} title={<>{r.label} {r.essential && <Badge>incompressible</Badge>}</>} action={
+              <span className="flex items-center gap-1">
+                <button onClick={() => setEditing(r)} className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs font-semibold hover:bg-muted"><Pencil className="size-3.5" /> Modifier</button>
+                <button onClick={() => actions.deleteRecurrence(r.id)} aria-label={`Supprimer ${r.label}`} className="p-1 text-muted-foreground"><Trash2 className="size-4" /></button>
+              </span>
+            }>
             <p className="text-sm text-muted-foreground">{fmt(r.amount, r.currency)} · {r.frequency} · {r.category}</p>
             <ul className="mt-2 divide-y divide-border">
               {next.map((o) => (
@@ -156,16 +165,28 @@ export function RecurrencesTab({ demo }: { demo: Demo }) {
   );
 }
 
-function RecurrenceForm({ demo, done }: { demo: Demo; done: () => void }) {
+function RecurrenceForm({ demo, done, initial }: { demo: Demo; done: () => void; initial?: Recurrence }) {
   const { data, base, actions } = demo;
-  const [f, setF] = useState({ kind: "depense" as Recurrence["kind"], label: "", amount: 0, frequency: "mensuelle" as Frequency, startDate: addDays(TODAY, 1), category: "", essential: true, accountId: data.accounts[0]!.id, endDate: "" });
+  const [f, setF] = useState({
+    kind: initial?.kind ?? ("depense" as Recurrence["kind"]),
+    label: initial?.label ?? "",
+    amount: initial?.amount ?? 0,
+    frequency: initial?.frequency ?? ("mensuelle" as Frequency),
+    startDate: initial?.startDate ?? addDays(TODAY, 1),
+    category: initial?.category ?? "",
+    essential: initial?.essential ?? true,
+    accountId: initial?.accountId ?? data.accounts[0]!.id,
+    endDate: initial?.endDate ?? "",
+  });
   const [errors, setErrors] = useState<string[]>([]);
   const account = data.accounts.find((a) => a.id === f.accountId)!;
   const set = (p: Partial<typeof f>) => setF({ ...f, ...p });
   const noRate = account.currency !== base && !findRate(data.rates, account.currency, base, TODAY);
   const submit = () => {
-    const errs = actions.addRecurrence({
-      id: newId("r"),
+    const save = initial ? actions.saveRecurrence : actions.addRecurrence;
+    const errs = save({
+      ...initial,
+      id: initial?.id ?? newId("r"),
       kind: f.kind,
       label: f.label.trim(),
       category: f.category.trim() || f.label.trim(),
@@ -212,7 +233,8 @@ function RecurrenceForm({ demo, done }: { demo: Demo; done: () => void }) {
       )}
       {noRate && <p className="text-xs text-danger">Aucun taux {account.currency} → {base} : ajoutez-le dans les paramètres pour l'inclure dans les totaux.</p>}
       <Errors list={errors} />
-      <PrimaryButton onClick={submit}>Ajouter</PrimaryButton>
+      {initial && <p className="text-xs text-muted-foreground">Toute la série est modifiée. Les paiements déjà confirmés sont conservés.</p>}
+      <PrimaryButton onClick={submit}>{initial ? "Enregistrer les modifications" : "Ajouter"}</PrimaryButton>
     </div>
   );
 }

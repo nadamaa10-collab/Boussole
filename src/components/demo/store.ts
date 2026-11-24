@@ -5,6 +5,8 @@ import {
   buildDemoData,
   buildEmptyData,
   migrateData,
+  addDays,
+  occurrences,
   formatMoney,
   previewBaseCurrencyChange,
   recordPayment,
@@ -239,6 +241,33 @@ export function useDemo(data: FinanceData, setData: (d: FinanceData) => void, cl
         if (errors.length) return errors;
         setData({ ...data, recurrences: [...data.recurrences, r] });
         notify("Échéance récurrente ajoutée.");
+        return [];
+      },
+      /**
+       * Modifie toute la série. Si sa date de départ ou sa fréquence change, les paiements
+       * déjà confirmés sont rattachés aux occurrences correspondantes de la nouvelle série
+       * (1re avec 1re, 2e avec 2e…), pour ne jamais les compter deux fois.
+       */
+      saveRecurrence(r: Recurrence): string[] {
+        const errors: string[] = [];
+        if (!r.label.trim()) errors.push("Donnez un nom à cette échéance.");
+        if (!(r.amount > 0)) errors.push("Le montant doit être supérieur à zéro.");
+        if (errors.length) return errors;
+        const old = data.recurrences.find((x) => x.id === r.id);
+        let payments = data.payments;
+        let next = r;
+        if (old && (old.startDate !== r.startDate || old.frequency !== r.frequency)) {
+          const far = addDays(TODAY, 3650);
+          const keys = (x: Recurrence) => occurrences({ payments: [] }, { ...x, overrides: undefined, endDate: undefined }, "1900-01-01", far).map((o) => o.key);
+          const oldKeys = keys(old);
+          const newKeys = keys(r);
+          payments = payments.map((p) =>
+            p.recurrenceId === r.id && p.occurrenceDate ? { ...p, occurrenceDate: newKeys[oldKeys.indexOf(p.occurrenceDate)] ?? p.occurrenceDate } : p,
+          );
+          next = { ...r, overrides: undefined };
+        }
+        setData({ ...data, payments, recurrences: data.recurrences.map((x) => (x.id === r.id ? next : x)) });
+        notify("Échéance récurrente modifiée.");
         return [];
       },
       updateRecurrence(r: Recurrence, message = "Occurrence modifiée, le reste de la série est inchangé.") {
