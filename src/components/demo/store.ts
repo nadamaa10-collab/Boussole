@@ -132,6 +132,15 @@ export function useDemo(data: FinanceData, setData: (d: FinanceData) => void, cl
         notify("Modifications enregistrées.");
         return [];
       },
+      /** Annule tous les paiements d'une facture : elle redevient « à payer » (ou « en retard » si l'échéance est passée). */
+      markUnpaid(invoiceId: string, dueDate?: string) {
+        setData({
+          ...data,
+          payments: data.payments.filter((p) => p.invoiceId !== invoiceId),
+          invoices: dueDate ? data.invoices.map((i) => (i.id === invoiceId ? { ...i, dueDate } : i)) : data.invoices,
+        });
+        notify("Marquée comme non payée. Votre argent disponible a été recalculé.");
+      },
       deletePayment(id: string) {
         setData({ ...data, payments: data.payments.filter((p) => p.id !== id) });
         notify("Paiement supprimé.");

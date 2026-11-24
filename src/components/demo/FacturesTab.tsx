@@ -79,6 +79,8 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPay, setConfirmPay] = useState<string | null>(null);
+  const [unpay, setUnpay] = useState(false);
+  const [unpayDue, setUnpayDue] = useState(inv.dueDate);
   const st = invoiceState(inv, data.payments, TODAY, data.settings.locale);
   const quote = economicQuote(data, inv);
   const accounts = data.accounts;
@@ -123,6 +125,9 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">{inv.reference ? `${inv.reference} · ` : ""}{inv.description} · {inv.category}</p>
           <div className="mt-2"><Badge tone={statusTone(inv, data)}>{st.label}</Badge></div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Le statut se met à jour tout seul : « payée » dès qu'un paiement couvre le montant, « en retard » si l'échéance est dépassée sans paiement complet.
+          </p>
         </div>
         <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted">
           <Pencil className="size-4" /> Modifier
@@ -141,6 +146,28 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
           <Row label={`Valeur au taux de facture`} value={fmt(inv.amountHT * quote.rate)} hint={`1 ${inv.currency} = ${quote.rate.toFixed(4)} ${base} · ${quote.source}`} />
         )}
       </div>
+
+      {st.payments.length > 0 && (
+        <div className="rounded-2xl border border-border p-4">
+          {!unpay ? (
+            <button onClick={() => setUnpay(true)} className="text-sm font-semibold text-primary">
+              {inv.kind === "client" ? "Ce client n'a pas (encore) payé ? Marquer comme non payée" : "Pas encore réglée ? Marquer comme non payée"}
+            </button>
+          ) : (
+            <div className="space-y-3 text-sm">
+              <p>Les paiements enregistrés seront retirés et votre argent disponible recalculé. Si l'échéance est déjà passée, la {inv.kind === "client" ? "facture" : "dépense"} apparaîtra « en retard ».</p>
+              <Field label="Échéance">
+                <input type="date" className={inputCls} value={unpayDue} onChange={(e) => setUnpayDue(e.target.value)} />
+              </Field>
+              <p className="text-xs text-muted-foreground">{unpayDue < TODAY ? "Échéance passée : elle sera affichée en retard." : unpayDue === TODAY ? "Échéance aujourd'hui." : "Échéance à venir : elle sera affichée « à payer »."}</p>
+              <div className="flex gap-2">
+                <button onClick={() => { actions.markUnpaid(inv.id, unpayDue); setUnpay(false); }} className="rounded-full bg-primary px-4 py-2 font-semibold text-primary-foreground">Confirmer</button>
+                <button onClick={() => setUnpay(false)} className="rounded-full px-4 py-2 font-semibold">Annuler</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {st.payments.length > 0 && (
         <div>

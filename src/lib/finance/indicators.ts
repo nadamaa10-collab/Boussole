@@ -5,7 +5,8 @@ import { formatMoney, roundMoney, sumMoney } from "./money";
 import { cashFlows, cashPosition } from "./cash";
 import { forecast } from "./forecast";
 import { profitability } from "./profitability";
-import { perMonth } from "./recurrence";
+import { occurrences, perMonth } from "./recurrence";
+import { formatDateFr } from "./dates";
 import type { FinanceData } from "./types";
 
 /* ------------------------------------------------------------------ */
@@ -207,11 +208,13 @@ export interface PriorityAction {
   impact: number;
   title: string;
   detail: string;
-  kind: "relance" | "echeance_client" | "fournisseur" | "risque_tresorerie" | "budget" | "depense_inhabituelle";
+  kind: "relance" | "echeance_client" | "fournisseur" | "charge_a_confirmer" | "risque_tresorerie" | "budget" | "depense_inhabituelle";
   targetId?: string;
+  /** Pour une charge récurrente : la série et la date théorique de l'occurrence. */
+  occurrence?: { recurrenceId: string; key: ISODate; amount: number; accountId: string };
 }
 
-export function priorityActions(data: FinanceData, today: ISODate, limit = 6): PriorityAction[] {
+export function priorityActions(data: FinanceData, today: ISODate, limit = 8): PriorityAction[] {
   const base = data.settings.baseCurrency;
   const fmt = (v: number) => formatMoney(v, base, data.settings.locale);
   const actions: PriorityAction[] = [];
@@ -221,6 +224,21 @@ export function priorityActions(data: FinanceData, today: ISODate, limit = 6): P
     const impact = c.baseValue ?? 0;
     if (c.late) actions.push({ severity: 1, impact, kind: "relance", title: `Relancer ${c.party}`, detail: c.label, targetId: c.invoiceId });
     else if (c.dueDate <= addDays(today, 7)) actions.push({ severity: 3, impact, kind: "echeance_client", title: `${c.party} doit payer bientôt`, detail: c.label, targetId: c.invoiceId });
+  }
+  // Charges récurrentes dont la date est passée et dont le paiement n'a pas été confirmé.
+  for (const r of data.recurrences) {
+    for (const o of occurrences(data, r, addDays(today, -90), today)) {
+      if (o.confirmed) continue;
+      const conv = convert(o.amount, r.currency, base, data.rates, today);
+      actions.push({
+        severity: 2,
+        impact: conv?.value ?? 0,
+        kind: "charge_a_confirmer",
+        title: r.kind === "depense" ? `${r.label} : payé ?` : `${r.label} : reçu ?`,
+        detail: `Prévu le ${formatDateFr(o.date)} · ${formatMoney(o.amount, r.currency, data.settings.locale)}. Confirmez-le pour mettre à jour votre argent disponible.`,
+        occurrence: { recurrenceId: r.id, key: o.key, amount: o.amount, accountId: r.accountId },
+      });
+    }
   }
   for (const c of payables.items) {
     if (c.dueDate <= addDays(today, 7)) {

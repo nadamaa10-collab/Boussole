@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, BellRing, CalendarClock, PiggyBank, TrendingDown, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, BellRing, CalendarClock, PiggyBank, Repeat, TrendingDown, Wallet } from "lucide-react";
 import {
   cashPosition,
   commitments,
@@ -11,7 +11,7 @@ import {
   startOfMonth,
 } from "@/lib/finance";
 import type { Demo } from "./store";
-import { TODAY } from "./store";
+import { TODAY, newId } from "./store";
 import { Badge, Big, Card, Empty, Help, Row } from "./ui";
 
 const ICONS = {
@@ -21,10 +21,11 @@ const ICONS = {
   risque_tresorerie: TrendingDown,
   budget: PiggyBank,
   depense_inhabituelle: AlertTriangle,
+  charge_a_confirmer: Repeat,
 };
 
 export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string) => void; onAdd: () => void }) {
-  const { data, fmt, base } = demo;
+  const { data, fmt, base, actions: act } = demo;
   const pos = cashPosition(data, TODAY);
   const { receivables, payables } = commitments(data, TODAY);
   const horizons = [7, 30, 90].map((days) => ({ days, f: forecast(data, { today: TODAY, days }) }));
@@ -69,6 +70,13 @@ export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string)
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             {pos.total === null ? <Big tone="muted">Taux manquant</Big> : <Big tone={pos.total < 0 ? "danger" : undefined}>{fmt(pos.total)}</Big>}
+            {pos.total !== null && f30.totals.outflows > 0 && (
+              <p className="mt-2 text-sm">
+                Après les charges et dépenses prévues d'ici 30 jours :{" "}
+                <span className={`font-num font-semibold ${pos.total - f30.totals.outflows < 0 ? "text-danger" : ""}`}>{fmt(pos.total - f30.totals.outflows)}</span>
+                <Help>Votre argent disponible ne baisse que lorsqu'un paiement est réellement fait (dépense marquée payée, ou charge récurrente confirmée). Ce second montant retire déjà tout ce qui est prévu de sortir dans les 30 jours ({fmt(f30.totals.outflows)}), sans compter ce que vos clients doivent vous payer.</Help>
+              </p>
+            )}
             <p className="mt-1 text-xs text-muted-foreground">
               Mis à jour le {formatDateFr(pos.lastUpdate)} · saisie manuelle
               {pos.usesEstimatedRates && " · contre-valeurs estimées (taux de démonstration fictifs)"}
@@ -149,6 +157,20 @@ export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string)
                       {a.severity === 1 && <Badge tone="danger">Urgent</Badge>}
                     </span>
                     <span className="block text-muted-foreground">{a.detail}</span>
+                    {a.occurrence && (
+                      <span className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => act.addPayment({ id: newId("p"), recurrenceId: a.occurrence!.recurrenceId, occurrenceDate: a.occurrence!.key, accountId: a.occurrence!.accountId, date: TODAY, amount: a.occurrence!.amount })}
+                          className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+                        >
+                          Oui, c'est fait
+                        </button>
+                        <button onClick={() => goTo("recurrences")} className="rounded-full border border-border px-3 py-1 text-xs font-semibold">Modifier</button>
+                      </span>
+                    )}
+                    {a.targetId && (a.kind === "relance" || a.kind === "fournisseur" || a.kind === "echeance_client") && (
+                      <button onClick={() => goTo("factures")} className="mt-1 text-xs font-semibold text-primary">Ouvrir dans Factures</button>
+                    )}
                   </span>
                 </li>
               );
