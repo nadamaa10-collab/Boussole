@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { BookOpen, ChartLine, FileText, Home, LayoutGrid, PiggyBank, Plus, Repeat, Scale, Settings } from "lucide-react";
+import { BookOpen, ChartLine, FileText, Home, LayoutGrid, MousePointerClick, PiggyBank, Plus, Repeat, Scale, Settings } from "lucide-react";
 import { formatDateFr, type FinanceData } from "@/lib/finance";
 import { useDemo, useDemoRoot, TODAY } from "@/components/demo/store";
 import { SetupScreen } from "@/components/demo/SetupScreen";
 import { SettingsSheet } from "@/components/demo/SettingsSheet";
+import { Tour, useTourSeen, type TourStep } from "@/components/demo/Tour";
 import { HomeTab } from "@/components/demo/HomeTab";
 import { TresorerieTab } from "@/components/demo/TresorerieTab";
 import { FacturesTab } from "@/components/demo/FacturesTab";
@@ -40,11 +41,29 @@ export function DemoApp() {
 function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: FinanceData) => void; clear: () => void }) {
   const demo = useDemo(data, setData, clear);
   const [settings, setSettings] = useState(false);
+  const [seen, setSeen] = useTourSeen("app");
+  const [tour, setTour] = useState(!seen && !data.demo);
   const [tab, setTab] = useState<TabId>("accueil");
   const [adding, setAdding] = useState(false);
   const [picking, setPicking] = useState(false);
   const [more, setMore] = useState(false);
   const current = TABS.find((t) => t.id === tab)!;
+
+  const steps: TourStep[] = [
+    { onEnter: () => setTab("accueil"), target: ["[data-tour=cash]"], title: "Votre argent disponible", text: "Le total de vos comptes aujourd'hui. Il bouge uniquement quand un paiement est réellement reçu ou effectué." },
+    { target: ["[data-tour=add-desktop]", "[data-tour=add-mobile]"], title: "Le bouton « + Ajouter »", text: "Votre geste quotidien. Une facture envoyée, une dépense, un paiement reçu, un transfert : une ligne suffit, en moins de 15 secondes." },
+    { target: ["[data-tour=upcoming]"], title: "Ce qui vous attend", text: "Ce qui va entrer et sortir dans les prochaines semaines, d'après les dates d'échéance que vous indiquez. Si votre solde risque de passer sous zéro, une alerte apparaît ici." },
+    { target: ["[data-tour=priorities]"], title: "Vos priorités du jour", text: "Les clients à relancer, les fournisseurs à payer et les budgets qui débordent remontent ici automatiquement." },
+    { onEnter: () => setTab("factures"), target: ["[data-tour=invoices]"], title: "Quand un client vous paie", text: "Ouvrez sa facture dans l'onglet Factures et cliquez « Enregistrer le paiement ». Il peut payer en plusieurs fois : Boussole calcule ce qu'il reste à recevoir." },
+    { onEnter: () => setTab("recurrences"), target: ["[data-tour=rec-add]"], title: "Vos charges qui reviennent", text: "Loyer, abonnements, assurance : ajoutez-les une seule fois. Elles seront prévues automatiquement chaque mois. Vous confirmerez chaque paiement quand il sera fait." },
+    { onEnter: () => setTab("tresorerie"), target: ["[data-tour=chart]"], title: "Votre trésorerie jour par jour", text: "Le solde prévu date par date. Touchez un point pour voir les mouvements du jour. Le scénario « Prudent » décale les paiements incertains." },
+    { target: ["[data-tour=simulate]"], title: "Et si… ?", text: "Testez un retard client, une grosse dépense ou un nouveau contrat, sans rien modifier dans vos données." },
+    { onEnter: () => setTab("rentabilite"), target: ["[data-tour=profit-detail]"], title: "Ce que votre activité gagne", text: "Les ventes et charges du mois, même pas encore payées. C'est différent de l'argent en banque, et c'est normal." },
+    { onEnter: () => setTab("budgets"), target: ["[data-tour=budget-add]"], title: "Vos budgets", text: "Fixez un plafond par catégorie (ex. Logiciels). Il passe à l'orange à 80 % et au rouge au-delà de 100 %." },
+    { onEnter: () => setTab("accueil"), target: ["[data-tour=settings]"], title: "Les paramètres", text: "Ajoutez un compte, vos impôts et cotisations (pour voir ce qu'il vous reste vraiment), vos objectifs. Vous pouvez aussi tout effacer ici." },
+    { target: ["[data-tour=currency]"], title: "Votre devise", text: "Changez de devise d'affichage quand vous voulez. Les montants d'origine de vos factures sont conservés." },
+    { target: ["[data-tour=guide]"], title: "Ce guide reste disponible", text: "Cliquez ici pour le revoir à tout moment. À vous de jouer : commencez par ajouter une facture ou une dépense." },
+  ];
 
   const go = (id: string) => {
     setTab(id as TabId);
@@ -68,13 +87,16 @@ function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: F
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setPicking(true)} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold hover:bg-muted" aria-label={`Devise de pilotage : ${demo.base}. Changer`}>
+          <button data-tour="guide" onClick={() => setTour(true)} className="inline-flex items-center gap-1.5 rounded-full p-2 text-sm font-semibold text-muted-foreground hover:bg-muted sm:px-3" aria-label="Revoir le guide" title="Revoir le guide">
+            <MousePointerClick className="size-4" /> <span className="hidden sm:inline">Guide</span>
+          </button>
+          <button data-tour="currency" onClick={() => setPicking(true)} className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold hover:bg-muted" aria-label={`Devise de pilotage : ${demo.base}. Changer`}>
             {demo.base} ▾
           </button>
-          <button onClick={() => setSettings(true)} className="rounded-full p-2 text-muted-foreground hover:bg-muted" aria-label="Paramètres" title="Paramètres">
+          <button data-tour="settings" onClick={() => setSettings(true)} className="rounded-full p-2 text-muted-foreground hover:bg-muted" aria-label="Paramètres" title="Paramètres">
             <Settings className="size-4" />
           </button>
-          <button onClick={() => setAdding(true)} className="hidden items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 md:inline-flex">
+          <button data-tour="add-desktop" onClick={() => setAdding(true)} className="hidden items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 md:inline-flex">
             <Plus className="size-4" /> Ajouter
           </button>
         </div>
@@ -109,7 +131,7 @@ function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: F
       <nav aria-label="Navigation de la démo" className="sticky inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {MOBILE_MAIN.slice(0, 2).map((id) => <MobileTab key={id} id={id} active={tab === id} onClick={() => setTab(id)} />)}
         <div className="flex items-center justify-center">
-          <button onClick={() => setAdding(true)} aria-label="Ajouter une opération" className="-mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-float">
+          <button data-tour="add-mobile" onClick={() => setAdding(true)} aria-label="Ajouter une opération" className="-mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-float">
             <Plus className="size-6" />
           </button>
         </div>
@@ -134,6 +156,7 @@ function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: F
       <AddSheet demo={demo} open={adding} onClose={() => setAdding(false)} />
       <CurrencyPicker demo={demo} open={picking} onClose={() => setPicking(false)} />
       <SettingsSheet demo={demo} open={settings} onClose={() => setSettings(false)} />
+      <Tour steps={steps} open={tour} onClose={() => { setTour(false); setSeen(); setTab("accueil"); }} />
 
       {/* Notifications */}
       <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-28 z-[60] flex flex-col items-center gap-2 px-4 md:bottom-6">

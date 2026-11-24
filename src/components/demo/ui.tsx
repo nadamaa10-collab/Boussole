@@ -1,9 +1,9 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { HelpCircle, X } from "lucide-react";
 
-export function Card({ title, help, action, children, className = "" }: { title?: ReactNode; help?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
+export function Card({ title, help, action, children, className = "", tour }: { title?: ReactNode; help?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; tour?: string }) {
   return (
-    <section className={`min-w-0 rounded-2xl border border-border bg-card p-4 sm:p-5 ${className}`}>
+    <section data-tour={tour} className={`min-w-0 rounded-2xl border border-border bg-card p-4 sm:p-5 ${className}`}>
       {(title || action) && (
         <header className="mb-3 flex items-start justify-between gap-3">
           {title && (

@@ -118,6 +118,7 @@ export function TresorerieTab({ demo }: { demo: Demo }) {
     <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
       <div className="space-y-4">
         <Card
+          tour="chart"
           title="Mon solde, jour par jour"
           help="Solde du jour + encaissements prévus − paiements prévus, date par date. Les mouvements déjà passés sont dans le solde du jour et ne sont jamais recomptés."
         >
@@ -199,7 +200,7 @@ export function TresorerieTab({ demo }: { demo: Demo }) {
           </Card>
         )}
 
-        <Card title={<><FlaskConical className="size-4" /> Simuler</>} help="Testez un imprévu sans rien modifier dans vos données.">
+        <Card tour="simulate" title={<><FlaskConical className="size-4" /> Simuler</>} help="Testez un imprévu sans rien modifier dans vos données.">
           <div className="space-y-3">
             <Field label="Un client paie en retard">
               <div className="flex gap-2">

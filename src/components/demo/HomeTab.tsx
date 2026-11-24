@@ -61,6 +61,7 @@ export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string)
       )}
       {/* 1. Argent disponible */}
       <Card
+        tour="cash"
         title={<><Wallet className="size-4" /> Mon argent disponible aujourd'hui</>}
         help="L'argent réellement présent sur vos comptes. Les factures que vos clients n'ont pas encore payées n'y sont jamais ajoutées."
         className="lg:col-span-2"
@@ -87,6 +88,7 @@ export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string)
 
       {/* 2. Ce qui m'attend */}
       <Card
+        tour="upcoming"
         title={<><CalendarClock className="size-4" /> Ce qui m'attend</>}
         help="Prévisions calculées jour par jour à partir des dates de paiement renseignées. Si un client paie plus tard, la prévision change."
         action={<button onClick={() => goTo("tresorerie")} className="text-sm font-semibold text-primary">Voir le détail</button>}
@@ -131,7 +133,7 @@ export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string)
       </Card>
 
       {/* 3. Actions prioritaires */}
-      <Card title={<><BellRing className="size-4" /> À faire en priorité</>} help="Classées par urgence, puis par montant en jeu.">
+      <Card tour="priorities" title={<><BellRing className="size-4" /> À faire en priorité</>} help="Classées par urgence, puis par montant en jeu.">
         {actions.length === 0 ? (
           <Empty>Rien d'urgent aujourd'hui.</Empty>
         ) : (
@@ -157,6 +159,7 @@ export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string)
 
       {/* 4. Rentabilité du mois */}
       <Card
+        tour="profit"
         title={<>Ce que mon activité gagne en {monthName}</>}
         help="Votre résultat mesure ce que votre activité a gagné, même si vos clients n'ont pas encore payé. Votre trésorerie mesure l'argent réellement disponible. Terme technique : résultat d'exploitation."
         action={<button onClick={() => goTo("rentabilite")} className="text-sm font-semibold text-primary">Détail</button>}

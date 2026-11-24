@@ -28,7 +28,7 @@ export function BudgetsTab({ demo }: { demo: Demo }) {
   const known = [...new Set([...data.invoices.filter((i) => i.kind === "fournisseur").map((i) => i.category), ...data.recurrences.filter((r) => r.kind === "depense").map((r) => r.category)])].filter((c) => !data.budgets.some((b) => b.category === c));
   return (
     <div className="space-y-4">
-      <Card title="Ajouter un budget mensuel">
+      <Card tour="budget-add" title="Ajouter un budget mensuel">
         <div className="flex flex-wrap gap-2">
           <input className={`${inputCls} min-w-[160px] flex-1`} list="budget-cats" placeholder="Catégorie (ex. Logiciels)" value={cat} onChange={(e) => setCat(e.target.value)} />
           <datalist id="budget-cats">{known.map((c) => <option key={c} value={c} />)}</datalist>
@@ -97,7 +97,7 @@ export function RecurrencesTab({ demo }: { demo: Demo }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="size-4" /> Nouvelle échéance récurrente</button>
+        <button data-tour="rec-add" onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="size-4" /> Nouvelle échéance récurrente</button>
       </div>
       {data.recurrences.length === 0 && <Empty>Ajoutez votre loyer, vos abonnements ou votre assurance : ils seront prévus automatiquement dans votre trésorerie.</Empty>}
       <Sheet open={adding} onClose={() => setAdding(false)} title="Échéance récurrente">

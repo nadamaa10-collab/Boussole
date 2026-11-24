@@ -41,7 +41,7 @@ export function RentabiliteTab({ demo }: { demo: Demo }) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card title="Le résultat du mois" help="Les revenus et charges sont rattachés au mois où la prestation est réalisée, quelle que soit la date de paiement.">
+        <Card tour="profit-detail" title="Le résultat du mois" help="Les revenus et charges sont rattachés au mois où la prestation est réalisée, quelle que soit la date de paiement.">
           <Row label="Revenus de la période (HT)" value={fmt(p.revenue)} />
           <Row label="Charges de la période" value={`− ${fmt(p.charges)}`} />
           <Row label={<>Ce que l'activité gagne <Help>Terme technique : résultat d'exploitation estimé.</Help></>} value={fmt(p.operatingResult)} strong tone={p.operatingResult < 0 ? "danger" : "success"} />

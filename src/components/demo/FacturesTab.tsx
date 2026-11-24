@@ -41,7 +41,7 @@ export function FacturesTab({ demo }: { demo: Demo }) {
         <Card title="Dont en retard"><p className={`font-num text-3xl ${totals.lateTotal ? "text-danger" : ""}`}>{totals.lateTotal === null ? "—" : fmt(totals.lateTotal)}</p></Card>
       </div>
 
-      <Card>
+      <Card tour="invoices">
         {list.length === 0 ? (
           <Empty>{kind === "client" ? "Aucune facture client à encaisser." : "Aucune facture fournisseur à payer."}</Empty>
         ) : (
