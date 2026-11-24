@@ -3,7 +3,7 @@ import { Tour, useTourSeen, type TourStep } from "./Tour";
 import { Plus, Trash2, MousePointerClick } from "lucide-react";
 import { CURRENCIES, currencyInfo, type SetupInput } from "@/lib/finance";
 import { Errors, Field, PrimaryButton, inputCls } from "./ui";
-import { TODAY } from "./store";
+import { TODAY, useDraft } from "./store";
 
 export function CurrencySelect({ value, onChange, id, label }: { value: string; onChange: (c: string) => void; id?: string; label?: string }) {
   return (
@@ -19,12 +19,22 @@ type AccountDraft = SetupInput["accounts"][number];
 
 /** Configuration initiale : le minimum pour commencer, sans connaître son régime fiscal. */
 export function SetupScreen({ onStart, onExample }: { onStart: (input: SetupInput) => void; onExample: () => void }) {
-  const [name, setName] = useState("");
-  const [country, setCountry] = useState("");
-  const [base, setBase] = useState("");
-  const [vat, setVat] = useState(false);
-  const [accounts, setAccounts] = useState<AccountDraft[]>([{ name: "Compte professionnel", kind: "banque", currency: "", balance: 0 }]);
-  const [rates, setRates] = useState<Record<string, number>>({});
+  // Tout le formulaire est gardé en brouillon : un rechargement de la page ne fait rien perdre.
+  const [form, setForm] = useDraft("setup", {
+    name: "",
+    country: "",
+    base: "",
+    vat: false,
+    accounts: [{ name: "Compte professionnel", kind: "banque", currency: "", balance: 0 }] as AccountDraft[],
+    rates: {} as Record<string, number>,
+  });
+  const { name, country, base, vat, accounts, rates } = form;
+  const setName = (v: string) => setForm({ ...form, name: v });
+  const setCountry = (v: string) => setForm({ ...form, country: v });
+  const setBase = (v: string) => setForm({ ...form, base: v });
+  const setVat = (v: boolean) => setForm({ ...form, vat: v });
+  const setAccounts = (v: AccountDraft[]) => setForm({ ...form, accounts: v });
+  const setRates = (v: Record<string, number>) => setForm({ ...form, rates: v });
   const [errors, setErrors] = useState<string[]>([]);
   const [seen, setSeen] = useTourSeen("setup");
   const [tour, setTour] = useState(false);

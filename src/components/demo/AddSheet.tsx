@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, FilePlus2, Receipt } from "lucide-react";
 import { CURRENCIES, addDays, findRate, invoiceState, type Invoice } from "@/lib/finance";
 import type { Demo } from "./store";
-import { TODAY, newId } from "./store";
+import { TODAY, newId, useDraft } from "./store";
 import { Errors, Field, PrimaryButton, Sheet, inputCls } from "./ui";
 
 type Mode = "menu" | "recette" | "depense" | "recu" | "effectue" | "transfert";
@@ -24,8 +24,11 @@ const TITLES: Record<Mode, string> = {
   transfert: "Transfert entre comptes",
 };
 
-export function AddSheet({ demo, open, onClose }: { demo: Demo; open: boolean; onClose: () => void }) {
-  const [mode, setMode] = useState<Mode>("menu");
+export function AddSheet({ demo, open, onClose, initialMode = "menu" }: { demo: Demo; open: boolean; onClose: () => void; initialMode?: Mode }) {
+  const [mode, setMode] = useState<Mode>(initialMode);
+  useEffect(() => {
+    if (open) setMode(initialMode);
+  }, [open, initialMode]);
   const close = () => {
     setMode("menu");
     onClose();
@@ -56,12 +59,14 @@ export function AddSheet({ demo, open, onClose }: { demo: Demo; open: boolean; o
 }
 
 /** Formulaire de facture : création, ou modification si `initial` est fourni. */
+export type AddMode = Mode;
+
 export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "client" | "fournisseur"; done: () => void; initial?: Invoice }) {
   const { data, base, actions } = demo;
   const client = kind === "client";
   const editing = !!initial;
   const hasPayments = editing && data.payments.some((p) => p.invoiceId === initial.id);
-  const [f, setF] = useState({
+  const [f, setF, clearDraft] = useDraft(editing ? null : `facture-${kind}`, {
     party: initial?.party ?? "",
     description: initial?.description ?? "",
     amount: initial?.amountHT ?? 0,
@@ -130,7 +135,10 @@ export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "
     const rates = needsRate ? [{ from: f.currency, to: base, rate: f.rate, date: f.issueDate, source: "Saisie manuelle" }] : [];
     const errs = actions.addInvoice(inv, f.paid ? { accountId: f.accountId, amount: f.amount + f.vat } : undefined, rates);
     setErrors(errs);
-    if (!errs.length) done();
+    if (!errs.length) {
+      clearDraft();
+      done();
+    }
   };
 
   return (

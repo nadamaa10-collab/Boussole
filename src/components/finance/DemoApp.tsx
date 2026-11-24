@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { BookOpen, ChartLine, FileText, Home, LayoutGrid, MousePointerClick, PiggyBank, Plus, Repeat, Scale, Settings } from "lucide-react";
+import { BookOpen, Check, CloudOff, Loader2, ChartLine, FileText, Home, LayoutGrid, MousePointerClick, PiggyBank, Plus, Repeat, Scale, Settings } from "lucide-react";
 import { formatDateFr, type FinanceData } from "@/lib/finance";
-import { useDemo, useDemoRoot, TODAY } from "@/components/demo/store";
+import { DraftContext, useDemo, useDemoRoot, TODAY } from "@/components/demo/store";
 import { SetupScreen } from "@/components/demo/SetupScreen";
 import { SettingsSheet } from "@/components/demo/SettingsSheet";
 import { Tour, useTourSeen, type TourStep } from "@/components/demo/Tour";
@@ -10,7 +10,7 @@ import { TresorerieTab } from "@/components/demo/TresorerieTab";
 import { FacturesTab } from "@/components/demo/FacturesTab";
 import { RentabiliteTab } from "@/components/demo/RentabiliteTab";
 import { BudgetsTab, JournalTab, RecurrencesTab } from "@/components/demo/MoreTabs";
-import { AddSheet } from "@/components/demo/AddSheet";
+import { AddSheet, type AddMode } from "@/components/demo/AddSheet";
 import { CurrencyPicker } from "@/components/demo/CurrencyPicker";
 import { Sheet } from "@/components/demo/ui";
 
@@ -26,20 +26,53 @@ const TABS = [
 type TabId = (typeof TABS)[number]["id"];
 const MOBILE_MAIN: TabId[] = ["accueil", "tresorerie", "factures", "rentabilite"];
 
+type Root = ReturnType<typeof useDemoRoot>;
+
+/** Où sont gardées les données, et si la dernière modification est bien enregistrée. */
+function SaveBadge({ root }: { root: Root }) {
+  const { storage, saving, saveError } = root;
+  if (storage === "aucun" || saveError) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger" role="status">
+        <CloudOff className="size-3.5" /> {saveError ?? "Non enregistré : ne rechargez pas la page"}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status" title={storage === "compte" ? "Gardé sur votre compte Claude : vous retrouvez vos données après un rechargement ou sur un autre appareil." : "Gardé dans ce navigateur, sur cet appareil."}>
+      {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5 text-success" />}
+      {saving ? "Enregistrement…" : storage === "compte" ? "Enregistré sur votre compte" : "Enregistré sur cet appareil"}
+    </span>
+  );
+}
+
 export function DemoApp() {
   const root = useDemoRoot();
-  if (!root.data) {
+  if (!root.ready) {
     return (
-      <div id="demo-app" className="scroll-mt-20 rounded-3xl border border-border bg-background shadow-float">
-        <SetupScreen onStart={root.start} onExample={root.loadExample} />
+      <div id="demo-app" className="flex min-h-[300px] scroll-mt-20 items-center justify-center gap-2 rounded-3xl border border-border bg-background text-muted-foreground shadow-float">
+        <Loader2 className="size-5 animate-spin" /> Chargement de vos données…
       </div>
     );
   }
-  return <Workspace data={root.data} setData={root.setData} clear={root.clear} />;
+  return (
+    <DraftContext.Provider value={root.draftApi}>
+      {!root.data ? (
+        <div id="demo-app" className="scroll-mt-20 rounded-3xl border border-border bg-background shadow-float">
+          <div className="flex justify-end px-5 pt-4 sm:px-8"><SaveBadge root={root} /></div>
+          <SetupScreen onStart={root.start} onExample={root.loadExample} />
+        </div>
+      ) : (
+        <Workspace root={root} data={root.data} setData={root.setData} clear={root.clear} />
+      )}
+    </DraftContext.Provider>
+  );
 }
 
-function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: FinanceData) => void; clear: () => void }) {
+function Workspace({ root, data, setData, clear }: { root: Root; data: FinanceData; setData: (d: FinanceData) => void; clear: () => void }) {
   const demo = useDemo(data, setData, clear);
+  const [addMode, setAddMode] = useState<AddMode>("menu");
+  const pendingDraft = root.drafts["facture-client"] ? "recette" : root.drafts["facture-fournisseur"] ? "depense" : null;
   const [settings, setSettings] = useState(false);
   const [seen, setSeen] = useTourSeen("app");
   const [tour, setTour] = useState(!seen && !data.demo);
@@ -82,9 +115,10 @@ function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: F
             {demo.data.demo ? (
               <>exemple fictif · <button onClick={clear} className="font-semibold text-primary">repartir de zéro</button></>
             ) : (
-              "données gardées sur cet appareil uniquement"
+              "vos données de test"
             )}
           </p>
+          <div className="mt-1"><SaveBadge root={root} /></div>
         </div>
         <div className="flex items-center gap-2">
           <button data-tour="guide" onClick={() => setTour(true)} className="inline-flex items-center gap-1.5 rounded-full p-2 text-sm font-semibold text-muted-foreground hover:bg-muted sm:px-3" aria-label="Revoir le guide" title="Revoir le guide">
@@ -118,6 +152,15 @@ function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: F
 
       <div className="min-h-[560px] p-3 pb-8 sm:p-6">
         <h2 className="mb-4 font-display text-2xl md:hidden">{current.label}</h2>
+        {pendingDraft && !adding && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-primary/5 p-3 text-sm">
+            <span>Vous aviez commencé {pendingDraft === "recette" ? "une facture client" : "une dépense"} sans l'enregistrer. Elle a été gardée.</span>
+            <span className="flex gap-2">
+              <button onClick={() => root.draftApi.set(pendingDraft === "recette" ? "facture-client" : "facture-fournisseur", undefined)} className="rounded-full px-3 py-1.5 font-semibold text-muted-foreground hover:bg-muted">Abandonner</button>
+              <button onClick={() => { setAddMode(pendingDraft); setAdding(true); }} className="rounded-full bg-primary px-4 py-1.5 font-semibold text-primary-foreground">Reprendre</button>
+            </span>
+          </div>
+        )}
         {tab === "accueil" && <HomeTab demo={demo} goTo={go} onAdd={() => setAdding(true)} />}
         {tab === "tresorerie" && <TresorerieTab demo={demo} />}
         {tab === "factures" && <FacturesTab demo={demo} />}
@@ -153,7 +196,7 @@ function Workspace({ data, setData, clear }: { data: FinanceData; setData: (d: F
         </ul>
       </Sheet>
 
-      <AddSheet demo={demo} open={adding} onClose={() => setAdding(false)} />
+      <AddSheet demo={demo} open={adding} initialMode={addMode} onClose={() => { setAdding(false); setAddMode("menu"); }} />
       <CurrencyPicker demo={demo} open={picking} onClose={() => setPicking(false)} />
       <SettingsSheet demo={demo} open={settings} onClose={() => setSettings(false)} />
       <Tour steps={steps} open={tour} onClose={() => { setTour(false); setSeen(); setTab("accueil"); }} />

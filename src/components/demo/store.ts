@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { openStore, type Store } from "./persist";
 import {
   applyBaseCurrencyChange,
   buildDemoData,
@@ -31,37 +32,111 @@ export interface Toast {
   tone: "ok" | "error";
 }
 
-const STORAGE_KEY = "boussole-demo-v1";
+/* ---------------------- Sauvegarde et brouillons ---------------------- */
 
-/** Les données restent dans ce navigateur uniquement (aucun serveur). */
-function load(): FinanceData | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? migrateData(JSON.parse(raw) as FinanceData) : null;
-  } catch {
-    return null;
-  }
+export interface Drafts {
+  get<T>(key: string): T | undefined;
+  set(key: string, value: unknown): void;
 }
 
-function save(data: FinanceData | null) {
-  try {
-    if (data) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    else localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* stockage indisponible : la démo fonctionne quand même, sans mémoire */
-  }
+export const DraftContext = createContext<Drafts>({ get: () => undefined, set: () => {} });
+
+/**
+ * Un état de formulaire gardé en brouillon : il survit à un rechargement de la page.
+ * `clear()` l'efface une fois le formulaire validé.
+ */
+export function useDraft<T extends object>(key: string | null, initial: T): [T, (v: T) => void, () => void] {
+  const drafts = useContext(DraftContext);
+  const [value, setValue] = useState<T>(() => (key ? { ...initial, ...(drafts.get<T>(key) ?? {}) } : initial));
+  const set = (v: T) => {
+    setValue(v);
+    if (key) drafts.set(key, v);
+  };
+  const clear = () => {
+    if (key) drafts.set(key, undefined);
+  };
+  return [value, set, clear];
 }
 
-/** Gère l'état avant configuration : null tant que l'utilisateur n'a pas démarré. */
+/** Gère le chargement, la sauvegarde et l'état avant configuration (null tant que rien n'est démarré). */
 export function useDemoRoot() {
-  const [data, setData] = useState<FinanceData | null>(load);
-  useEffect(() => save(data), [data]);
+  const [store, setStore] = useState<Store | null>(null);
+  const [data, setData] = useState<FinanceData | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, unknown>>({});
+  const [, refresh] = useState(0);
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    let alive = true;
+    void openStore().then((s) => {
+      if (!alive) return;
+      setData(s.initial.data ? migrateData(s.initial.data) : null);
+      setDrafts(s.initial.drafts ?? {});
+      s.onStatus(() => refresh((x) => x + 1));
+      setStore(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Chaque changement est enregistré (regroupé par le module de sauvegarde).
+  useEffect(() => {
+    if (!store) return;
+    if (!loaded.current) {
+      loaded.current = true;
+      return;
+    }
+    store.save({ data, drafts });
+  }, [store, data, drafts]);
+
+  // Onglet masqué ou fermé : on écrit tout de suite.
+  useEffect(() => {
+    if (!store) return;
+    const onHide = () => document.visibilityState === "hidden" && store.flushNow();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", store.flushNow);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", store.flushNow);
+    };
+  }, [store]);
+
+  const draftApi = useMemo<Drafts>(
+    () => ({
+      get: <T,>(key: string) => drafts[key] as T | undefined,
+      set: (key: string, value: unknown) =>
+        setDrafts((d) => {
+          const next = { ...d };
+          if (value === undefined) delete next[key];
+          else next[key] = value;
+          return next;
+        }),
+    }),
+    [drafts],
+  );
+
   return {
+    ready: !!store,
+    storage: store?.kind ?? "aucun",
+    saving: store?.status.pending ?? false,
+    saveError: store?.status.error ?? null,
     data,
     setData,
-    start: (input: SetupInput) => setData(buildEmptyData(input, TODAY)),
+    drafts,
+    draftApi,
+    start: (input: SetupInput) => {
+      setData(buildEmptyData(input, TODAY));
+      setDrafts((d) => {
+        const { setup: _s, ...rest } = d;
+        return rest;
+      });
+    },
     loadExample: () => setData(buildDemoData(TODAY)),
-    clear: () => setData(null),
+    clear: () => {
+      setData(null);
+      setDrafts({});
+    },
   };
 }
 
