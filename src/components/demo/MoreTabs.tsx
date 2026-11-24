@@ -15,6 +15,7 @@ import {
 } from "@/lib/finance";
 import type { Demo } from "./store";
 import { TODAY, newId } from "./store";
+import { InvoiceDetail } from "./FacturesTab";
 import { Badge, Card, Empty, Errors, Field, Help, PrimaryButton, Segmented, Sheet, inputCls } from "./ui";
 
 /* ------------------------------ Budgets ------------------------------ */
@@ -221,7 +222,13 @@ function RecurrenceForm({ demo, done }: { demo: Demo; done: () => void }) {
 const KIND_LABEL = { exploitation: "Activité", investissement: "Investissement", financement: "Apport / retrait / emprunt", interne: "Transfert" };
 
 export function JournalTab({ demo }: { demo: Demo }) {
-  const { data, fmt, base } = demo;
+  const { data, fmt, base, actions } = demo;
+  const [openInvoice, setOpenInvoice] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const invoiceOf = (sourceId: string) => data.payments.find((p) => p.id === sourceId)?.invoiceId;
+  const recurrencePayment = (sourceId: string) => data.payments.find((p) => p.id === sourceId && p.recurrenceId);
+  const movement = (sourceId: string) => data.movements.find((m) => m.id === sourceId);
+  const inv = data.invoices.find((i) => i.id === openInvoice);
   const [q, setQ] = useState("");
   const [dir, setDir] = useState<"tout" | "entrees" | "sorties">("tout");
   const [acc, setAcc] = useState("");
@@ -278,15 +285,34 @@ export function JournalTab({ demo }: { demo: Demo }) {
                   <span className="block truncate">{r.label}</span>
                   <span className="text-xs text-muted-foreground">{formatDateFr(r.date)} · {r.account.name} · {KIND_LABEL[r.kind]}{r.inOpening && " · déjà dans le solde de départ"}</span>
                 </span>
-                <span className={`font-num shrink-0 text-right ${r.amount > 0 ? "text-success" : ""}`}>
-                  {r.amount > 0 ? "+" : "−"}{fmt(Math.abs(r.amount), r.account.currency)}
-                  {r.account.currency !== base && r.base !== null && <span className="block text-xs text-muted-foreground">≈ {fmt(Math.abs(r.base))}</span>}
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className={`font-num text-right ${r.amount > 0 ? "text-success" : ""}`}>
+                    {r.amount > 0 ? "+" : "−"}{fmt(Math.abs(r.amount), r.account.currency)}
+                    {r.account.currency !== base && r.base !== null && <span className="block text-xs text-muted-foreground">≈ {fmt(Math.abs(r.base))}</span>}
+                  </span>
+                  {invoiceOf(r.sourceId) ? (
+                    <button onClick={() => setOpenInvoice(invoiceOf(r.sourceId)!)} className="rounded-full border border-border px-3 py-1 text-xs font-semibold hover:bg-muted">Voir / modifier</button>
+                  ) : confirm === r.sourceId ? (
+                    <button
+                      onClick={() => { if (movement(r.sourceId)) actions.deleteMovement(r.sourceId); else actions.deletePayment(r.sourceId); setConfirm(null); }}
+                      className="rounded-full bg-danger px-3 py-1 text-xs font-semibold text-white"
+                    >
+                      Confirmer
+                    </button>
+                  ) : movement(r.sourceId) || recurrencePayment(r.sourceId) ? (
+                    <button onClick={() => setConfirm(r.sourceId)} aria-label="Supprimer" title={recurrencePayment(r.sourceId) ? "Annuler ce paiement (l'échéance redevient à payer)" : "Supprimer ce mouvement"} className="rounded-full p-1.5 text-muted-foreground hover:bg-muted">
+                      <Trash2 className="size-4" />
+                    </button>
+                  ) : null}
                 </span>
               </li>
             ))}
           </ul>
         )}
       </Card>
+      <Sheet open={!!inv} onClose={() => setOpenInvoice(null)} title={inv?.party ?? ""}>
+        {inv && <InvoiceDetail key={inv.id} demo={demo} inv={inv} onClose={() => setOpenInvoice(null)} />}
+      </Sheet>
     </div>
   );
 }

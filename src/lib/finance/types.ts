@@ -181,4 +181,6 @@ export interface FinanceData {
   budgets: Budget[];
   /** true = jeu de démonstration, à signaler dans l'interface. */
   demo?: boolean;
+  /** Version du format des données enregistrées (pour les migrations). */
+  version?: number;
 }

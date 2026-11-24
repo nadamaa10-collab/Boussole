@@ -5,6 +5,8 @@ import {
   breakEven,
   buildDemoData,
   buildEmptyData,
+  migrateData,
+  recordPayment as record,
   cashFlowStatement,
   cashPosition,
   commitments,
@@ -414,5 +416,21 @@ describe("Démarrage à vide", () => {
     expect(cashPosition(data, T).total).toBe(13080);
     expect(forecast(data, { today: T, days: 30 }).end).toBe(13080);
     expect(profitability(data, month.from, month.to).resultLabel).toBe("Résultat estimé avant prélèvements");
+  });
+});
+
+describe("Saisie le jour de la configuration", () => {
+  it("une dépense payée le jour même est bien déduite du solde du matin", () => {
+    let data = buildEmptyData({ companyName: "X", baseCurrency: "EUR", vatRegistered: false, accounts: [{ name: "B", kind: "banque", currency: "EUR", balance: 5000 }] }, T);
+    data = { ...data, invoices: [inv({ id: "d", kind: "fournisseur", amountHT: 300, issueDate: T, dueDate: T })] };
+    data = record(data, { id: "p", invoiceId: "d", accountId: "compte-1", date: T, amount: 300 }, T);
+    expect(cashPosition(data, T).total).toBe(4700);
+  });
+
+  it("répare les données enregistrées avec l'ancien format", () => {
+    const old = { ...base(), accounts: [{ ...base().accounts[0]!, openingDate: T }], payments: [{ id: "p", accountId: "a", date: T, amount: 300 }] };
+    expect(cashPosition(old, T).total).toBe(5000);
+    expect(cashPosition(migrateData(old), T).total).toBe(5300);
+    expect(migrateData(migrateData(old)).accounts[0]!.openingDate).toBe(addDays(T, -1));
   });
 });

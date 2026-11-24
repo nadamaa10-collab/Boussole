@@ -3,6 +3,7 @@ import {
   applyBaseCurrencyChange,
   buildDemoData,
   buildEmptyData,
+  migrateData,
   formatMoney,
   previewBaseCurrencyChange,
   recordPayment,
@@ -36,7 +37,7 @@ const STORAGE_KEY = "boussole-demo-v1";
 function load(): FinanceData | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as FinanceData) : null;
+    return raw ? migrateData(JSON.parse(raw) as FinanceData) : null;
   } catch {
     return null;
   }
@@ -96,7 +97,7 @@ export function useDemo(data: FinanceData, setData: (d: FinanceData) => void, cl
           }
         }
         setData(next);
-        notify(inv.kind === "client" ? "Facture client ajoutée." : "Dépense ajoutée.");
+        notify(inv.kind === "client" ? "Facture ajoutée : retrouvez-la dans Factures › Recettes." : "Dépense ajoutée : retrouvez-la dans Factures › Dépenses.");
         return [];
       },
       addPayment(p: Payment, allowOverpayment = false): string[] {
@@ -117,6 +118,27 @@ export function useDemo(data: FinanceData, setData: (d: FinanceData) => void, cl
         setData({ ...data, movements: [...data.movements, m] });
         notify("Mouvement enregistré.");
         return [];
+      },
+      /** Remplace une facture existante après validation ; ses paiements sont conservés. */
+      saveInvoice(inv: Invoice, rates: FxRate[] = []): string[] {
+        const withRates = { ...data, rates: [...data.rates, ...rates] };
+        const { errors } = validateInvoice(withRates, inv);
+        if (errors.length) return errors;
+        const paid = data.payments.filter((p) => p.invoiceId === inv.id).reduce((s, p) => s + (p.settledAmount ?? p.amount), 0);
+        if (inv.amountHT + inv.vatAmount < paid - 0.005) {
+          return [`Le montant ne peut pas être inférieur à ce qui a déjà été payé (${formatMoney(paid, inv.currency, data.settings.locale)}). Supprimez d'abord un paiement si besoin.`];
+        }
+        setData({ ...withRates, invoices: data.invoices.map((i) => (i.id === inv.id ? inv : i)) });
+        notify("Modifications enregistrées.");
+        return [];
+      },
+      deletePayment(id: string) {
+        setData({ ...data, payments: data.payments.filter((p) => p.id !== id) });
+        notify("Paiement supprimé.");
+      },
+      deleteMovement(id: string) {
+        setData({ ...data, movements: data.movements.filter((m) => m.id !== id) });
+        notify("Mouvement supprimé.");
       },
       updateInvoice(id: string, change: Partial<Invoice>) {
         setData({ ...data, invoices: data.invoices.map((i) => (i.id === id ? { ...i, ...change } : i)) });

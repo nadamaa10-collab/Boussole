@@ -55,29 +55,32 @@ export function AddSheet({ demo, open, onClose }: { demo: Demo; open: boolean; o
   );
 }
 
-function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fournisseur"; done: () => void }) {
+/** Formulaire de facture : création, ou modification si `initial` est fourni. */
+export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "client" | "fournisseur"; done: () => void; initial?: Invoice }) {
   const { data, base, actions } = demo;
   const client = kind === "client";
+  const editing = !!initial;
+  const hasPayments = editing && data.payments.some((p) => p.invoiceId === initial.id);
   const [f, setF] = useState({
-    party: "",
-    description: "",
-    amount: 0,
-    currency: base,
-    issueDate: TODAY,
-    dueDate: addDays(TODAY, client ? 30 : 15),
+    party: initial?.party ?? "",
+    description: initial?.description ?? "",
+    amount: initial?.amountHT ?? 0,
+    currency: initial?.currency ?? base,
+    issueDate: initial?.issueDate ?? TODAY,
+    dueDate: initial?.dueDate ?? addDays(TODAY, client ? 30 : 15),
     paid: false,
     accountId: data.accounts[0]!.id,
-    category: client ? "Prestations" : "Divers",
-    vat: 0,
-    expected: "",
-    confidence: "probable" as Invoice["confidence"],
-    immo: false,
-    months: 36,
-    spread: false,
-    periodEnd: addDays(TODAY, 89),
-    rate: 0,
+    category: initial?.category ?? (client ? "Prestations" : "Divers"),
+    vat: initial?.vatAmount ?? 0,
+    expected: initial?.expectedPaymentDate ?? "",
+    confidence: (initial?.confidence ?? "probable") as Invoice["confidence"],
+    immo: initial?.nature === "immobilisation",
+    months: initial?.usefulLifeMonths ?? 36,
+    spread: !!initial?.servicePeriod,
+    periodEnd: initial?.servicePeriod?.end ?? addDays(TODAY, 89),
+    rate: initial?.economicRate?.rate ?? 0,
   });
-  const [advanced, setAdvanced] = useState(false);
+  const [advanced, setAdvanced] = useState(editing);
   const [errors, setErrors] = useState<string[]>([]);
   const set = (p: Partial<typeof f>) => setF({ ...f, ...p });
   const categories = [...new Set(data.invoices.filter((i) => i.kind === kind).map((i) => i.category).concat(data.budgets.map((b) => b.category)))];
@@ -91,7 +94,8 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
       return;
     }
     const inv: Invoice = {
-      id: newId(client ? "f" : "a"),
+      ...initial,
+      id: initial?.id ?? newId(client ? "f" : "a"),
       kind,
       party: f.party.trim(),
       description: f.description.trim() || (client ? "Prestation" : "Achat"),
@@ -106,8 +110,19 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
       expectedPaymentDate: f.expected || undefined,
       confidence: client ? f.confidence : undefined,
       servicePeriod: client && f.spread ? { start: f.issueDate, end: f.periodEnd } : undefined,
-      economicRate: needsRate ? { rate: f.rate, date: f.issueDate, source: "Saisie manuelle", base } : undefined,
+      economicRate: needsRate
+        ? { rate: f.rate, date: f.issueDate, source: "Saisie manuelle", base }
+        : initial && initial.currency === f.currency && initial.issueDate === f.issueDate
+          ? initial.economicRate
+          : undefined,
     };
+    if (editing) {
+      const rates = needsRate ? [{ from: f.currency, to: base, rate: f.rate, date: f.issueDate, source: "Saisie manuelle" }] : [];
+      const errs = actions.saveInvoice(inv, rates);
+      setErrors(errs);
+      if (!errs.length) done();
+      return;
+    }
     if (f.paid && account.currency !== f.currency) {
       setErrors(["Pour un paiement immédiat, choisissez un compte dans la devise de la facture, ou enregistrez le paiement ensuite depuis la facture."]);
       return;
@@ -128,7 +143,7 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
           <input type="number" inputMode="decimal" min={0} step="0.01" className={inputCls} value={f.amount || ""} onChange={(e) => set({ amount: Number(e.target.value) })} />
         </Field>
         <Field label="Devise">
-          <select className={inputCls} value={f.currency} onChange={(e) => set({ currency: e.target.value })}>
+          <select className={inputCls} value={f.currency} disabled={hasPayments} title={hasPayments ? "Des paiements existent déjà dans cette devise" : undefined} onChange={(e) => set({ currency: e.target.value })}>
             {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
           </select>
         </Field>
@@ -140,6 +155,7 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
         <Field label="Date"><input type="date" className={inputCls} value={f.issueDate} onChange={(e) => set({ issueDate: e.target.value })} /></Field>
         <Field label="Échéance"><input type="date" className={inputCls} value={f.dueDate} onChange={(e) => set({ dueDate: e.target.value })} /></Field>
       </div>
+      {!editing && (
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={f.paid} onChange={(e) => set({ paid: e.target.checked })} /> {client ? "Déjà encaissée" : "Déjà payée"}
         {f.paid && (
@@ -148,6 +164,7 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
           </select>
         )}
       </label>
+      )}
       {needsRate && (
         <Field label={`1 ${f.currency} = combien de ${base} ?`} hint="Taux du jour de la facture. Il sera figé pour calculer votre rentabilité.">
           <input type="number" step="0.0001" min={0} className={inputCls} value={f.rate || ""} onChange={(e) => set({ rate: Number(e.target.value) })} />
@@ -196,7 +213,7 @@ function InvoiceForm({ demo, kind, done }: { demo: Demo; kind: "client" | "fourn
         </div>
       )}
       <Errors list={errors} />
-      <PrimaryButton onClick={submit} disabled={!f.party.trim() || !(f.amount > 0)}>Ajouter</PrimaryButton>
+      <PrimaryButton onClick={submit} disabled={!f.party.trim() || !(f.amount > 0)}>{editing ? "Enregistrer les modifications" : "Ajouter"}</PrimaryButton>
     </div>
   );
 }

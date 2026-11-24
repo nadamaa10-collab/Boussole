@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { formatDateFr, type Account, type Levy } from "@/lib/finance";
+import { addDays, formatDateFr, type Account, type Levy } from "@/lib/finance";
 import type { Demo } from "./store";
 import { TODAY, newId } from "./store";
 import { CurrencySelect } from "./SetupScreen";
@@ -22,7 +22,7 @@ export function SettingsSheet({ demo, open, onClose }: { demo: Demo; open: boole
     setErrors(errs);
     if (errs.length) return;
     actions.addAccount(
-      { id: newId("compte"), name: acc.name.trim(), kind: acc.kind, currency: acc.currency, openingBalance: acc.balance, openingDate: TODAY, source: "manuel" },
+      { id: newId("compte"), name: acc.name.trim(), kind: acc.kind, currency: acc.currency, openingBalance: acc.balance, openingDate: addDays(TODAY, -1), source: "manuel" },
       needsRate ? [{ from: acc.currency, to: base, rate: acc.rate, date: TODAY, source: "Saisie manuelle" }] : [],
     );
     setAcc({ name: "", kind: "banque", currency: base, balance: 0, rate: 0 });
@@ -57,7 +57,7 @@ export function SettingsSheet({ demo, open, onClose }: { demo: Demo; open: boole
             {data.accounts.map((a) => (
               <li key={a.id} className="flex justify-between py-2 text-sm">
                 <span>{a.name} <span className="text-muted-foreground">· {a.currency}</span></span>
-                <span className="text-right text-muted-foreground">{fmt(a.openingBalance, a.currency)} au {formatDateFr(a.openingDate)}</span>
+                <span className="text-right text-muted-foreground">{fmt(a.openingBalance, a.currency)} le {formatDateFr(addDays(a.openingDate, 1))} au matin</span>
               </li>
             ))}
           </ul>

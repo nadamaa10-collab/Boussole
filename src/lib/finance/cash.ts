@@ -98,7 +98,8 @@ export function cashPosition(data: FinanceData, asOf: ISODate): CashPosition {
       const balance = accountBalance(data, account, asOf, flows);
       const conv = convert(balance, account.currency, base, data.rates, asOf);
       const dates = flows.filter((f) => f.accountId === account.id && f.date > account.openingDate && f.date <= asOf).map((f) => f.date);
-      const lastUpdate = [account.openingDate, ...dates].sort().at(-1)!;
+      // Le solde de départ vaut pour le lendemain matin de sa date de référence.
+      const lastUpdate = [addDays(account.openingDate, 1) > asOf ? asOf : addDays(account.openingDate, 1), ...dates].sort().at(-1)!;
       return { account, balance, baseValue: conv?.value ?? null, quote: conv?.quote ?? null, lastUpdate };
     });
   const missingRates = [...new Set(accounts.filter((a) => a.baseValue === null).map((a) => `${a.account.currency} → ${base}`))];

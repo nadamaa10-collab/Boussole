@@ -1,4 +1,4 @@
-import type { ISODate } from "./dates";
+import { addDays, type ISODate } from "./dates";
 import type { CurrencyCode } from "./money";
 import type { Account, FinanceData, FxRate } from "./types";
 
@@ -36,7 +36,8 @@ export function buildEmptyData(input: SetupInput, today: ISODate): FinanceData {
       kind: a.kind,
       currency: a.currency,
       openingBalance: a.balance,
-      openingDate: today,
+      // Le solde saisi est celui du matin : il inclut tout jusqu'à la veille, pas les opérations du jour.
+      openingDate: addDays(today, -1),
       source: "manuel",
     })),
     invoices: [],
@@ -45,5 +46,22 @@ export function buildEmptyData(input: SetupInput, today: ISODate): FinanceData {
     recurrences: [],
     rates,
     budgets: [],
+    version: DATA_VERSION,
+  };
+}
+
+export const DATA_VERSION = 2;
+
+/**
+ * Migration des données enregistrées.
+ * v1 → v2 : le solde de départ était daté du jour de la saisie, ce qui ignorait
+ * les opérations de ce même jour. Il est désormais daté de la veille (solde du matin).
+ */
+export function migrateData(data: FinanceData): FinanceData {
+  if (data.demo || (data.version ?? 1) >= DATA_VERSION) return data;
+  return {
+    ...data,
+    accounts: data.accounts.map((a) => (a.source === "manuel" ? { ...a, openingDate: addDays(a.openingDate, -1) } : a)),
+    version: DATA_VERSION,
   };
 }
