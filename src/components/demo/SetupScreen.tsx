@@ -3,6 +3,7 @@ import { Tour, useTourSeen, type TourStep } from "./Tour";
 import { Plus, Trash2, MousePointerClick } from "lucide-react";
 import { CURRENCIES, currencyInfo, type SetupInput } from "@/lib/finance";
 import { Errors, Field, PrimaryButton, inputCls } from "./ui";
+import { TODAY } from "./store";
 
 export function CurrencySelect({ value, onChange, id, label }: { value: string; onChange: (c: string) => void; id?: string; label?: string }) {
   return (
@@ -59,6 +60,7 @@ export function SetupScreen({ onStart, onExample }: { onStart: (input: SetupInpu
     if (!base) errs.push("Choisissez votre devise principale.");
     if (!accounts.length) errs.push("Ajoutez au moins un compte.");
     accounts.forEach((a, i) => !Number.isFinite(a.balance) && errs.push(`Solde invalide pour le compte ${i + 1}.`));
+    accounts.forEach((a, i) => a.date && a.date > TODAY && errs.push(`La date du solde du compte ${i + 1} ne peut pas être dans le futur.`));
     foreign.forEach((c) => !(rates[c]! > 0) && errs.push(`Indiquez le taux ${c} → ${base}.`));
     setErrors(errs);
     if (errs.length) return;
@@ -99,7 +101,7 @@ export function SetupScreen({ onStart, onExample }: { onStart: (input: SetupInpu
       <div className="space-y-3">
         <div>
           <p className="font-semibold">Vos comptes et leur solde aujourd'hui</p>
-          <p className="text-sm text-muted-foreground">Le montant affiché par votre banque ce matin. Boussole part de là.</p>
+          <p className="text-sm text-muted-foreground">Le montant affiché par votre banque ce matin. Boussole part de là. Vous pouvez aussi partir d'un solde plus ancien (ex. au 1er du mois) et saisir ensuite les opérations depuis cette date.</p>
         </div>
         {accounts.map((a, i) => (
           <div key={i} data-tour={i === 0 ? "setup-account" : undefined} className="space-y-3 rounded-2xl border border-border bg-card p-4">
@@ -121,6 +123,10 @@ export function SetupScreen({ onStart, onExample }: { onStart: (input: SetupInpu
                 {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
               </select>
               <input type="number" inputMode="decimal" step="0.01" className={`${inputCls} col-span-2 sm:col-span-1`} value={Number.isFinite(a.balance) && a.balance !== 0 ? a.balance : ""} placeholder="Solde" onChange={(e) => setAcc(i, { balance: e.target.value === "" ? 0 : Number(e.target.value) })} aria-label="Solde aujourd'hui" />
+              <label className="col-span-2 flex items-center gap-2 text-sm text-muted-foreground sm:col-span-3">
+                Solde au matin du
+                <input type="date" max={TODAY} className="rounded-lg border border-border bg-card px-2 py-1 text-foreground" value={a.date ?? TODAY} onChange={(e) => setAcc(i, { date: e.target.value || undefined })} aria-label="Date du solde" />
+              </label>
             </div>
           </div>
         ))}

@@ -7,7 +7,7 @@ export interface SetupInput {
   country?: string;
   baseCurrency: CurrencyCode;
   vatRegistered: boolean;
-  accounts: { name: string; kind: Account["kind"]; currency: CurrencyCode; balance: number }[];
+  accounts: { name: string; kind: Account["kind"]; currency: CurrencyCode; balance: number; /** Date du solde (le matin). Par défaut : aujourd'hui. */ date?: ISODate }[];
   /** Taux saisis par l'utilisateur pour les comptes dans une autre devise (1 devise du compte = x devise principale). */
   rates?: Record<CurrencyCode, number>;
 }
@@ -36,8 +36,8 @@ export function buildEmptyData(input: SetupInput, today: ISODate): FinanceData {
       kind: a.kind,
       currency: a.currency,
       openingBalance: a.balance,
-      // Le solde saisi est celui du matin : il inclut tout jusqu'à la veille, pas les opérations du jour.
-      openingDate: addDays(today, -1),
+      // Le solde saisi est celui du matin de sa date : il inclut tout jusqu'à la veille, pas les opérations du jour.
+      openingDate: addDays(a.date && a.date <= today ? a.date : today, -1),
       source: "manuel",
     })),
     invoices: [],

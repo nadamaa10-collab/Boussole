@@ -159,7 +159,7 @@ export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={f.paid} onChange={(e) => set({ paid: e.target.checked })} /> {client ? "Déjà encaissée" : "Déjà payée"}
         {f.paid && (
-          <select className="ml-auto rounded-lg border border-border bg-card px-2 py-1" value={f.accountId} onChange={(e) => set({ accountId: e.target.value })}>
+          <select aria-label="Compte du paiement" className="ml-auto rounded-lg border border-border bg-card px-2 py-1" value={f.accountId} onChange={(e) => set({ accountId: e.target.value })}>
             {data.accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
           </select>
         )}
