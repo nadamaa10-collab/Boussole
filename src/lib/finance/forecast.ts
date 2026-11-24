@@ -4,6 +4,7 @@ import { invoiceState } from "./invoices";
 import { formatMoney, roundMoney, sumMoney } from "./money";
 import { occurrences } from "./recurrence";
 import { cashPosition } from "./cash";
+import { levySchedule } from "./levies";
 import type { Confidence, FinanceData } from "./types";
 import { formatDateFr } from "./dates";
 
@@ -134,6 +135,22 @@ export function forecastEvents(data: FinanceData, opts: ForecastOptions) {
     }
   }
 
+  // Impôts et cotisations configurés : échéances non payées (les retards sont dus aujourd'hui).
+  for (const d of levySchedule(data, addDays(today, -120), horizon, today)) {
+    if (d.remaining <= 0) continue;
+    push({
+      date: maxDate(d.dueDate, today),
+      rateDate: today,
+      label: `${d.levy.label} — ${d.periodLabel}${d.provisional ? " (estimation en cours)" : ""}`,
+      original: { amount: d.remaining, currency: base },
+      direction: "decaissement",
+      status: d.dueDate < today ? "en_retard" : "prevu",
+      confidence: "confirme",
+      shifted: false,
+      sourceId: `levy:${d.levy.label}@${d.period}`,
+    });
+  }
+
   for (const [i, s] of (opts.simulations ?? []).entries()) {
     if (s.date < today || s.date > horizon) continue;
     events.push({
@@ -180,7 +197,8 @@ export function forecast(data: FinanceData, opts: ForecastOptions): Forecast {
   const { events, unconverted } = forecastEvents(data, opts);
   const points: ForecastPoint[] = [];
   let balance = pos.total;
-  let min: Forecast["min"] = null;
+  // Le point le plus bas part du solde réel de ce matin : il ne peut pas dépasser l'argent disponible.
+  let min: Forecast["min"] = { date: opts.today, balance: pos.total };
   let firstNegative: Forecast["firstNegative"] = null;
   for (let d = 0; d <= opts.days; d++) {
     const date = addDays(opts.today, d);

@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { Download, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import {
   addDays,
+  addMonths,
+  endOfMonth,
   budgetStatus,
   cashFlows,
   convert,
@@ -10,13 +12,14 @@ import {
   occurrences,
   overrideOccurrence,
   findRate,
+  categoriesFor,
   type Frequency,
   type Recurrence,
 } from "@/lib/finance";
 import type { Demo } from "./store";
 import { TODAY, newId } from "./store";
 import { InvoiceDetail } from "./FacturesTab";
-import { Badge, Card, Empty, Errors, Field, Help, PrimaryButton, Segmented, Sheet, inputCls } from "./ui";
+import { CategorySelect, Badge, Card, Empty, Errors, Field, Help, PrimaryButton, Segmented, Sheet, inputCls } from "./ui";
 
 /* ------------------------------ Budgets ------------------------------ */
 
@@ -26,13 +29,14 @@ export function BudgetsTab({ demo }: { demo: Demo }) {
   const { warning, over } = data.settings.budgetThresholds;
   const [cat, setCat] = useState("");
   const [amt, setAmt] = useState(0);
-  const known = [...new Set([...data.invoices.filter((i) => i.kind === "fournisseur").map((i) => i.category), ...data.recurrences.filter((r) => r.kind === "depense").map((r) => r.category)])].filter((c) => !data.budgets.some((b) => b.category === c));
+  const known = categoriesFor(data, "depense").filter((c) => !data.budgets.some((b) => b.category === c));
   return (
     <div className="space-y-4">
       <Card tour="budget-add" title="Ajouter un budget mensuel">
         <div className="flex flex-wrap gap-2">
-          <input className={`${inputCls} min-w-[160px] flex-1`} list="budget-cats" placeholder="Catégorie (ex. Logiciels)" value={cat} onChange={(e) => setCat(e.target.value)} />
-          <datalist id="budget-cats">{known.map((c) => <option key={c} value={c} />)}</datalist>
+          <div className="min-w-[200px] flex-1">
+            <CategorySelect value={cat} options={known} onChange={setCat} onCreate={(n) => actions.addCategory("depense", n)} />
+          </div>
           <input type="number" min={0} className={`${inputCls} w-36`} placeholder={`Montant (${base})`} value={amt || ""} onChange={(e) => setAmt(Number(e.target.value))} />
           <button disabled={!cat.trim() || !(amt > 0)} onClick={() => { actions.upsertBudget({ category: cat.trim(), monthly: amt }); setCat(""); setAmt(0); }} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50">
             <Plus className="size-4" /> Ajouter
@@ -219,7 +223,11 @@ function RecurrenceForm({ demo, done, initial }: { demo: Demo; done: () => void;
         <Field label="Prochaine échéance"><input type="date" className={inputCls} value={f.startDate} onChange={(e) => set({ startDate: e.target.value })} /></Field>
         <Field label="Fin (facultatif)"><input type="date" className={inputCls} value={f.endDate} onChange={(e) => set({ endDate: e.target.value })} /></Field>
       </div>
-      <Field label="Catégorie" hint="Sert aux budgets. Par défaut, le nom."><input className={inputCls} value={f.category} onChange={(e) => set({ category: e.target.value })} /></Field>
+      <div>
+        <span className="mb-1 block text-sm font-semibold">Catégorie</span>
+        <CategorySelect value={f.category} options={categoriesFor(data, f.kind)} onChange={(category) => set({ category })} onCreate={(n) => actions.addCategory(f.kind, n)} />
+        <span className="mt-1 block text-xs text-muted-foreground">Sert à suivre vos budgets.</span>
+      </div>
       <Field label="Compte">
         <select className={inputCls} value={f.accountId} onChange={(e) => set({ accountId: e.target.value })}>
           {data.accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
@@ -254,6 +262,16 @@ export function JournalTab({ demo }: { demo: Demo }) {
   const [q, setQ] = useState("");
   const [dir, setDir] = useState<"tout" | "entrees" | "sorties">("tout");
   const [acc, setAcc] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const month = TODAY.slice(0, 7);
+  const prevMonth = addMonths(`${month}-01`, -1).slice(0, 7);
+  const presets = [
+    { label: "Tout", from: "", to: "" },
+    { label: "Ce mois-ci", from: `${month}-01`, to: endOfMonth(month) },
+    { label: "Mois dernier", from: `${prevMonth}-01`, to: endOfMonth(prevMonth) },
+    { label: "30 derniers jours", from: addDays(TODAY, -30), to: TODAY },
+  ];
   const accounts = new Map(data.accounts.map((a) => [a.id, a]));
 
   const rows = useMemo(
@@ -266,10 +284,11 @@ export function JournalTab({ demo }: { demo: Demo }) {
         })
         .filter((f) => (dir === "tout" ? true : dir === "entrees" ? f.amount > 0 : f.amount < 0))
         .filter((f) => !acc || f.accountId === acc)
+        .filter((f) => (!from || f.date >= from) && (!to || f.date <= to))
         .filter((f) => !q || `${f.label} ${f.account.name}`.toLowerCase().includes(q.toLowerCase()))
         .sort((a, b) => b.date.localeCompare(a.date)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, q, dir, acc, base],
+    [data, q, dir, acc, base, from, to],
   );
 
   const exportCsv = () => {
@@ -297,6 +316,16 @@ export function JournalTab({ demo }: { demo: Demo }) {
         </select>
         <Segmented label="Sens" value={dir} onChange={setDir} options={[{ value: "tout", label: "Tout" }, { value: "entrees", label: "Entrées" }, { value: "sorties", label: "Sorties" }]} />
         <button onClick={exportCsv} className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-muted"><Download className="size-4" /> CSV</button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-semibold">Période :</span>
+        {presets.map((pr) => (
+          <button key={pr.label} onClick={() => { setFrom(pr.from); setTo(pr.to); }} className={`rounded-full px-3 py-1 font-semibold ${from === pr.from && to === pr.to ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+            {pr.label}
+          </button>
+        ))}
+        <label className="flex items-center gap-1">du <input type="date" className="rounded-lg border border-border bg-card px-2 py-1" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="Du" /></label>
+        <label className="flex items-center gap-1">au <input type="date" className="rounded-lg border border-border bg-card px-2 py-1" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Au" /></label>
       </div>
       <Card title={<>Mouvements réels <Help>Uniquement l'argent qui a réellement bougé. Les mouvements antérieurs au solde de départ d'un compte y sont déjà inclus : ils sont affichés mais ne sont pas recomptés.</Help></>}>
         {rows.length === 0 ? <Empty>Aucun mouvement ne correspond.</Empty> : (

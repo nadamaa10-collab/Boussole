@@ -10,6 +10,7 @@ import {
   commitments,
   forecast,
   invoiceState,
+  levySchedule,
   priorityActions,
   profitability,
   recordPayment,
@@ -185,7 +186,8 @@ describe("Cas d'école Studio Nour", () => {
     const f30 = forecast(c.s6, { today: T, days: 30 });
     expect(f30.totals).toEqual({ inflows: 32000, outflows: 13000 });
     expect(f30.end).toBe(38200);
-    expect(f30.min).toEqual({ date: "2026-12-01", balance: 28600 });
+    // Le point le plus bas part de l'argent disponible ce matin (Café Atlas, en retard, n'est pas garanti).
+    expect(f30.min).toEqual({ date: T, balance: 19200 });
     expect(f30.firstNegative).toBeNull();
 
     const prudent = forecast(c.s6, { today: T, days: 30, scenario: "prudent" });
@@ -197,6 +199,11 @@ describe("Cas d'école Studio Nour", () => {
     expect(sim.firstNegative).toEqual({ date: "2026-12-02", balance: -3400 });
     expect(sim.min).toEqual({ date: "2026-12-16", balance: -8800 });
     expect(sim.end).toBe(3200);
+
+    // Cotisations trimestrielles : 2 % du CA du 4e trimestre (octobre + novembre saisis), payables fin janvier.
+    const due = levySchedule(c.s6, T, "2027-03-31", T);
+    expect(due.map((d) => [d.period, d.dueDate, d.amount, d.provisional])).toEqual([["2026-T4", "2027-01-31", 1009.2, true]]);
+    expect(forecast(c.s6, { today: T, days: 90 }).end).toBe(28190.8);
 
     const b = Object.fromEntries(budgetStatus(c.s6, "2026-11").map((x) => [x.category, [x.percent, x.level]]));
     expect(b).toEqual({ Logiciels: [120, "depasse"], Fournitures: [113, "depasse"], Déplacements: [90, "alerte"], "Sous-traitance": [87, "alerte"] });

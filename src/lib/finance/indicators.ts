@@ -6,6 +6,7 @@ import { cashFlows, cashPosition } from "./cash";
 import { forecast } from "./forecast";
 import { profitability } from "./profitability";
 import { occurrences, perMonth } from "./recurrence";
+import { levySchedule } from "./levies";
 import { formatDateFr } from "./dates";
 import type { FinanceData } from "./types";
 
@@ -208,10 +209,12 @@ export interface PriorityAction {
   impact: number;
   title: string;
   detail: string;
-  kind: "relance" | "echeance_client" | "fournisseur" | "charge_a_confirmer" | "risque_tresorerie" | "budget" | "depense_inhabituelle";
+  kind: "relance" | "echeance_client" | "fournisseur" | "charge_a_confirmer" | "impot" | "risque_tresorerie" | "budget" | "depense_inhabituelle";
   targetId?: string;
   /** Pour une charge récurrente : la série et la date théorique de l'occurrence. */
   occurrence?: { recurrenceId: string; key: ISODate; amount: number; accountId: string };
+  /** Pour un impôt ou des cotisations : la période à payer. */
+  levy?: { label: string; period: string; amount: number };
 }
 
 export function priorityActions(data: FinanceData, today: ISODate, limit = 8): PriorityAction[] {
@@ -239,6 +242,18 @@ export function priorityActions(data: FinanceData, today: ISODate, limit = 8): P
         occurrence: { recurrenceId: r.id, key: o.key, amount: o.amount, accountId: r.accountId },
       });
     }
+  }
+  // Impôts et cotisations : échéance dans les 7 jours ou dépassée.
+  for (const d of levySchedule(data, addDays(today, -120), addDays(today, 7), today)) {
+    if (d.remaining <= 0) continue;
+    actions.push({
+      severity: d.dueDate < today ? 1 : 2,
+      impact: d.remaining,
+      kind: "impot",
+      title: `${d.levy.label} (${d.periodLabel}) : payé ?`,
+      detail: `${formatMoney(d.remaining, base, data.settings.locale)} estimés, à payer ${d.dueDate < today ? "depuis le" : "avant le"} ${formatDateFr(d.dueDate)}.`,
+      levy: { label: d.levy.label, period: d.period, amount: d.remaining },
+    });
   }
   for (const c of payables.items) {
     if (c.dueDate <= addDays(today, 7)) {

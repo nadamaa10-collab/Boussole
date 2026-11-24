@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { addDays, formatDateFr, type Account, type Levy } from "@/lib/finance";
 import type { Demo } from "./store";
 import { TODAY, newId } from "./store";
@@ -10,9 +10,10 @@ export function SettingsSheet({ demo, open, onClose }: { demo: Demo; open: boole
   const { data, base, fmt, actions } = demo;
   const s = data.settings;
   const [acc, setAcc] = useState({ name: "", kind: "banque" as Account["kind"], currency: base, balance: 0, rate: 0 });
-  const [levy, setLevy] = useState({ label: "", rate: 0, base: "chiffre_affaires" as Levy["base"], source: "" });
+  const [levy, setLevy] = useState({ label: "", rate: 0, base: "chiffre_affaires" as Levy["base"], source: "", frequency: "trimestrielle" as NonNullable<Levy["frequency"]>, dueDay: 31 });
   const [errors, setErrors] = useState<string[]>([]);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [editAcc, setEditAcc] = useState<{ id: string; balance: number; date: string } | null>(null);
   const needsRate = acc.currency !== base && !data.rates.some((r) => (r.from === acc.currency && r.to === base) || (r.to === acc.currency && r.from === base));
 
   const addAccount = () => {
@@ -35,8 +36,8 @@ export function SettingsSheet({ demo, open, onClose }: { demo: Demo; open: boole
     if (!levy.source.trim()) errs.push("Indiquez d'où vient ce taux (site officiel, comptable…) pour pouvoir le vérifier.");
     setErrors(errs);
     if (errs.length) return;
-    actions.addLevy({ label: levy.label.trim(), rate: levy.rate / 100, base: levy.base, validFrom: `${TODAY.slice(0, 4)}-01-01`, source: levy.source.trim() });
-    setLevy({ label: "", rate: 0, base: "chiffre_affaires", source: "" });
+    actions.addLevy({ label: levy.label.trim(), rate: levy.rate / 100, base: levy.base, validFrom: `${TODAY.slice(0, 4)}-01-01`, source: levy.source.trim(), frequency: levy.frequency, dueDay: levy.dueDay });
+    setLevy({ label: "", rate: 0, base: "chiffre_affaires", source: "", frequency: "trimestrielle", dueDay: 31 });
   };
 
   return (
@@ -54,12 +55,34 @@ export function SettingsSheet({ demo, open, onClose }: { demo: Demo; open: boole
         <section className="space-y-3">
           <h3 className="font-semibold">Comptes</h3>
           <ul className="divide-y divide-border rounded-2xl bg-card px-4">
-            {data.accounts.map((a) => (
-              <li key={a.id} className="flex justify-between py-2 text-sm">
-                <span>{a.name} <span className="text-muted-foreground">· {a.currency}</span></span>
-                <span className="text-right text-muted-foreground">{fmt(a.openingBalance, a.currency)} le {formatDateFr(addDays(a.openingDate, 1))} au matin</span>
-              </li>
-            ))}
+            {data.accounts.map((a) =>
+              editAcc?.id === a.id ? (
+                <li key={a.id} className="space-y-2 py-3 text-sm">
+                  <p className="font-semibold">{a.name} : solde de départ</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label={`Solde (${a.currency})`}>
+                      <input type="number" step="0.01" className={inputCls} value={editAcc.balance} onChange={(e) => setEditAcc({ ...editAcc, balance: Number(e.target.value) })} />
+                    </Field>
+                    <Field label="Au matin du">
+                      <input type="date" max={TODAY} className={inputCls} value={editAcc.date} onChange={(e) => setEditAcc({ ...editAcc, date: e.target.value })} />
+                    </Field>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Pour saisir des opérations plus anciennes, reculez cette date et indiquez le solde de ce jour-là (relevé bancaire). Les paiements antérieurs à cette date sont considérés comme déjà inclus dans le solde.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { actions.updateAccount(a.id, { name: a.name, openingBalance: editAcc.balance, openingDate: addDays(editAcc.date, -1) }); setEditAcc(null); }} className="rounded-full bg-primary px-4 py-1.5 font-semibold text-primary-foreground">Enregistrer</button>
+                    <button onClick={() => setEditAcc(null)} className="px-3 py-1.5">Annuler</button>
+                  </div>
+                </li>
+              ) : (
+                <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                  <span>{a.name} <span className="text-muted-foreground">· {a.currency}</span></span>
+                  <span className="flex items-center gap-2 text-right text-muted-foreground">
+                    {fmt(a.openingBalance, a.currency)} le {formatDateFr(addDays(a.openingDate, 1))} au matin
+                    <button onClick={() => setEditAcc({ id: a.id, balance: a.openingBalance, date: addDays(a.openingDate, 1) })} aria-label={`Modifier le solde de départ de ${a.name}`} className="rounded-full p-1.5 hover:bg-muted"><Pencil className="size-3.5" /></button>
+                  </span>
+                </li>
+              ),
+            )}
           </ul>
           <div className="space-y-2 rounded-2xl border border-border p-3">
             <input className={inputCls} placeholder="Nom du nouveau compte" value={acc.name} onChange={(e) => setAcc({ ...acc, name: e.target.value })} />
@@ -85,7 +108,7 @@ export function SettingsSheet({ demo, open, onClose }: { demo: Demo; open: boole
           <p className="text-sm text-muted-foreground">Facultatif. Sans eux, Boussole affiche un résultat « avant prélèvements ». Il n'invente jamais de taux.</p>
           {s.levies.map((l) => (
             <div key={l.label} className="flex items-center justify-between rounded-xl bg-card px-3 py-2 text-sm">
-              <span>{l.label} · {Math.round(l.rate * 1000) / 10} % {l.base === "chiffre_affaires" ? "du CA" : "du résultat"}<span className="block text-xs text-muted-foreground">{l.source}</span></span>
+              <span>{l.label} · {Math.round(l.rate * 1000) / 10} % {l.base === "chiffre_affaires" ? "du CA" : "du résultat"} · {l.frequency === "mensuelle" ? "mensuel" : l.frequency === "annuelle" ? "annuel" : "trimestriel"}<span className="block text-xs text-muted-foreground">{l.source}</span></span>
               <button onClick={() => actions.removeLevy(l.label)} aria-label={`Retirer ${l.label}`} className="p-2 text-muted-foreground"><Trash2 className="size-4" /></button>
             </div>
           ))}
@@ -98,6 +121,19 @@ export function SettingsSheet({ demo, open, onClose }: { demo: Demo; open: boole
                 <option value="resultat">du résultat</option>
               </select>
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select className={inputCls} value={levy.frequency} onChange={(e) => setLevy({ ...levy, frequency: e.target.value as NonNullable<Levy["frequency"]> })} aria-label="Payé chaque">
+                <option value="mensuelle">Payé chaque mois</option>
+                <option value="trimestrielle">Payé chaque trimestre</option>
+                <option value="annuelle">Payé chaque année</option>
+              </select>
+              <label className="flex items-center gap-2 text-sm">
+                le
+                <input type="number" min={1} max={31} className={`${inputCls} w-20`} value={levy.dueDay} onChange={(e) => setLevy({ ...levy, dueDay: Math.max(1, Math.min(31, Number(e.target.value) || 31)) })} aria-label="Jour de paiement" />
+                <span>du mois suivant</span>
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">Ex. trimestriel : les cotisations d'octobre à décembre sont payées en janvier, le jour indiqué (31 = dernier jour du mois). Vérifiez la date réelle de votre régime.</p>
             <input className={inputCls} placeholder="Source du taux (ex. site officiel, mon comptable)" value={levy.source} onChange={(e) => setLevy({ ...levy, source: e.target.value })} />
             <button onClick={addLevy} className="text-sm font-semibold text-primary">Ajouter</button>
           </div>

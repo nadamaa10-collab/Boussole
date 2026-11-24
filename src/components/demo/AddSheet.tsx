@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, FilePlus2, Receipt } from "lucide-react";
-import { CURRENCIES, addDays, findRate, invoiceState, type Invoice } from "@/lib/finance";
+import { CURRENCIES, addDays, categoriesFor, findRate, invoiceState, type Invoice } from "@/lib/finance";
 import type { Demo } from "./store";
 import { TODAY, newId, useDraft } from "./store";
-import { Errors, Field, PrimaryButton, Sheet, inputCls } from "./ui";
+import { CONFIDENCE_HELP, CategorySelect, Errors, Field, PrimaryButton, Sheet, inputCls } from "./ui";
 
 type Mode = "menu" | "recette" | "depense" | "recu" | "effectue" | "transfert";
 
@@ -75,7 +75,7 @@ export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "
     dueDate: initial?.dueDate ?? addDays(TODAY, client ? 30 : 15),
     paid: false,
     accountId: data.accounts[0]!.id,
-    category: initial?.category ?? (client ? "Prestations" : "Divers"),
+    category: initial?.category ?? (client ? "Prestations" : ""),
     vat: initial?.vatAmount ?? 0,
     expected: initial?.expectedPaymentDate ?? "",
     confidence: (initial?.confidence ?? "probable") as Invoice["confidence"],
@@ -88,12 +88,16 @@ export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "
   const [advanced, setAdvanced] = useState(editing);
   const [errors, setErrors] = useState<string[]>([]);
   const set = (p: Partial<typeof f>) => setF({ ...f, ...p });
-  const categories = [...new Set(data.invoices.filter((i) => i.kind === kind).map((i) => i.category).concat(data.budgets.map((b) => b.category)))];
+  const categories = categoriesFor(data, client ? "recette" : "depense");
   const account = data.accounts.find((a) => a.id === f.accountId)!;
   const knownRate = f.currency === base ? null : findRate(data.rates, f.currency, base, f.issueDate);
   const needsRate = f.currency !== base && !knownRate;
 
   const submit = () => {
+    if (!f.category.trim()) {
+      setErrors(["Choisissez une catégorie : elle sert à suivre vos budgets."]);
+      return;
+    }
     if (needsRate && !(f.rate > 0)) {
       setErrors([`Indiquez le taux ${f.currency} → ${base} à la date de la facture.`]);
       return;
@@ -159,6 +163,11 @@ export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "
       <Field label="Description">
         <input className={inputCls} value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder={client ? "Ex. Site vitrine" : "Ex. Impressions"} />
       </Field>
+      <div>
+        <span className="mb-1 block text-sm font-semibold">Catégorie</span>
+        <CategorySelect required={!client} value={f.category} options={categories} onChange={(category) => set({ category })} onCreate={(n) => actions.addCategory(client ? "recette" : "depense", n)} />
+        <span className="mt-1 block text-xs text-muted-foreground">Sert à suivre vos budgets et à voir où part l'argent.</span>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date"><input type="date" className={inputCls} value={f.issueDate} onChange={(e) => set({ issueDate: e.target.value })} /></Field>
         <Field label="Échéance"><input type="date" className={inputCls} value={f.dueDate} onChange={(e) => set({ dueDate: e.target.value })} /></Field>
@@ -173,6 +182,11 @@ export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "
         )}
       </label>
       )}
+      {f.paid && account && f.issueDate <= account.openingDate && (
+        <p className="rounded-xl bg-warning/10 p-2 text-xs">
+          Payée avant le solde de départ de « {account.name} » : elle compte dans votre rentabilité, mais pas dans l'argent disponible, car elle est déjà incluse dans ce solde. Pour la faire compter, reculez la date du solde de départ dans les paramètres.
+        </p>
+      )}
       {needsRate && (
         <Field label={`1 ${f.currency} = combien de ${base} ?`} hint="Taux du jour de la facture. Il sera figé pour calculer votre rentabilité.">
           <input type="number" step="0.0001" min={0} className={inputCls} value={f.rate || ""} onChange={(e) => set({ rate: Number(e.target.value) })} />
@@ -181,20 +195,16 @@ export function InvoiceForm({ demo, kind, done, initial }: { demo: Demo; kind: "
       {knownRate && <p className="text-xs text-muted-foreground">Valeur en {base} calculée avec le taux connu : 1 {f.currency} = {knownRate.rate.toFixed(4)} {base} ({knownRate.source}).</p>}
 
       <button type="button" className="text-sm font-semibold text-primary" onClick={() => setAdvanced((a) => !a)} aria-expanded={advanced}>
-        {advanced ? "Masquer les options" : "Plus d'options (catégorie, TVA, date estimée…)"}
+        {advanced ? "Masquer les options" : "Plus d'options (TVA, date estimée, fiabilité…)"}
       </button>
       {advanced && (
         <div className="space-y-3 rounded-2xl bg-muted/50 p-3">
-          <Field label="Catégorie">
-            <input className={inputCls} list={`cats-${kind}`} value={f.category} onChange={(e) => set({ category: e.target.value })} />
-            <datalist id={`cats-${kind}`}>{categories.map((c) => <option key={c} value={c} />)}</datalist>
-          </Field>
           <Field label="TVA (montant)"><input type="number" min={0} className={inputCls} value={f.vat || ""} onChange={(e) => set({ vat: Number(e.target.value) })} /></Field>
           <Field label="Date de paiement estimée" hint="Si vous pensez être payé (ou payer) à une autre date que l'échéance.">
             <input type="date" className={inputCls} value={f.expected} onChange={(e) => set({ expected: e.target.value })} />
           </Field>
           {client && (
-            <Field label="Ce paiement est…">
+            <Field label="Fiabilité du paiement" hint={CONFIDENCE_HELP[f.confidence ?? "probable"]}>
               <select className={inputCls} value={f.confidence} onChange={(e) => set({ confidence: e.target.value as Invoice["confidence"] })}>
                 <option value="confirme">Confirmé</option>
                 <option value="probable">Probable</option>

@@ -18,3 +18,5 @@ export * from "./indicators";
 export * from "./base-currency";
 export * from "./demo-data";
 export * from "./setup";
+export * from "./levies";
+export * from "./categories";

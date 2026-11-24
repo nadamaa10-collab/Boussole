@@ -21,6 +21,10 @@ export interface Levy {
   validFrom: ISODate;
   /** Référence permettant de vérifier le taux (texte officiel, expert-comptable…) */
   source: string;
+  /** Rythme de paiement (par défaut : trimestriel). */
+  frequency?: "mensuelle" | "trimestrielle" | "annuelle";
+  /** Jour du mois qui suit la période où le paiement est dû (par défaut : dernier jour). */
+  dueDay?: number;
 }
 
 export interface Settings {
@@ -45,6 +49,8 @@ export interface Settings {
   variableCostRate?: number;
   cashReserveTarget?: number;
   monthlyRevenueTarget?: number;
+  /** Catégories ajoutées par l'utilisateur. */
+  customCategories?: { depense: string[]; recette: string[] };
   /** Trace des changements de devise principale. */
   baseCurrencyHistory?: { from: CurrencyCode; to: CurrencyCode; date: ISODate; referenceDate: ISODate }[];
 }
@@ -125,7 +131,8 @@ export type MovementType =
   | "emprunt" // déblocage d'un prêt : entrée d'argent, pas un revenu
   | "remboursement_emprunt" // capital (hors résultat) + intérêts (charge)
   | "transfert" // entre deux comptes : neutre
-  | "frais_bancaires";
+  | "frais_bancaires"
+  | "prelevement"; // paiement d'impôts ou de cotisations : sortie d'argent, déjà estimée à part dans le résultat
 
 export interface Movement {
   id: string;
@@ -139,6 +146,9 @@ export interface Movement {
   toAmount?: number;
   /** Remboursement d'emprunt : part d'intérêts incluse dans `amount`. */
   interestPart?: number;
+  /** Paiement d'impôts ou de cotisations : prélèvement concerné et période payée (ex. « 2026-T4 »). */
+  levyLabel?: string;
+  period?: string;
   description?: string;
 }
 

@@ -9,11 +9,13 @@ import {
   monthlyRevenueStats,
   profitability,
   runway,
+  levySchedule,
+  formatDateFr,
   startOfMonth,
 } from "@/lib/finance";
 import type { Demo } from "./store";
-import { TODAY } from "./store";
-import { Card, Empty, Help, Row } from "./ui";
+import { TODAY, newId } from "./store";
+import { Badge, Card, Empty, Help, Row, inputCls } from "./ui";
 
 const monthLabel = (m: string) => new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${m}-01`));
 
@@ -70,6 +72,8 @@ export function RentabiliteTab({ demo }: { demo: Demo }) {
           {p.revenueLines.length === 0 ? <Empty>Aucun revenu rattaché à ce mois.</Empty> : p.revenueLines.map((l) => <Row key={l.sourceId} label={l.label} value={fmt(l.amount)} />)}
         </Card>
 
+        <LevyCard demo={demo} />
+
         <Card title="Repères de dirigeant" className="lg:col-span-2">
           <div className="grid gap-6 md:grid-cols-3">
             <div>
@@ -105,5 +109,92 @@ export function RentabiliteTab({ demo }: { demo: Demo }) {
         </Card>
       </div>
     </div>
+  );
+}
+
+/** Échéancier des impôts et cotisations : montant estimé par période, et paiement réel à enregistrer. */
+function LevyCard({ demo }: { demo: Demo }) {
+  const { data, fmt, base, actions } = demo;
+  const [paying, setPaying] = useState<string | null>(null);
+  const [amount, setAmount] = useState(0);
+  const [date, setDate] = useState(TODAY);
+  const [errors, setErrors] = useState<string[]>([]);
+  if (!data.settings.levies.length) {
+    return (
+      <Card title="Impôts et cotisations" className="lg:col-span-2">
+        <Empty>Ajoutez vos impôts et cotisations dans les paramètres (roue dentée) pour voir ce qu'il vous reste vraiment et quand les payer.</Empty>
+      </Card>
+    );
+  }
+  const items = levySchedule(data, addDays(TODAY, -120), addDays(TODAY, 400), TODAY);
+  const accountId = data.accounts.find((a) => a.currency === base)?.id ?? data.accounts[0]!.id;
+  return (
+    <Card
+      title="Impôts et cotisations à payer"
+      help="Chaque période est estimée avec le taux que vous avez saisi et ce qui est enregistré dans Boussole. Une période en cours peut encore augmenter. Enregistrez le montant réellement payé : il est retiré de votre argent disponible."
+      className="lg:col-span-2"
+    >
+      {items.length === 0 ? (
+        <Empty>Aucune échéance pour le moment : il faut du chiffre d'affaires saisi sur une période.</Empty>
+      ) : (
+        <ul className="divide-y divide-border">
+          {items.map((d) => {
+            const key = `${d.levy.label}@${d.period}`;
+            return (
+              <li key={key} className="py-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    <span className="font-semibold">{d.levy.label}</span> · {d.periodLabel}
+                    <span className="block text-xs text-muted-foreground">
+                      À payer avant le {formatDateFr(d.dueDate)}{d.provisional ? " · estimation, période en cours" : ""}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-num">{fmt(d.amount)}</span>
+                    {d.remaining <= 0 ? (
+                      <Badge tone="success">Payé</Badge>
+                    ) : d.dueDate < TODAY ? (
+                      <Badge tone="danger">En retard</Badge>
+                    ) : (
+                      <Badge tone="info">À venir</Badge>
+                    )}
+                    {d.remaining > 0 && paying !== key && (
+                      <button onClick={() => { setPaying(key); setAmount(d.remaining); setDate(TODAY); setErrors([]); }} className="rounded-full border border-border px-3 py-1 text-xs font-semibold hover:bg-muted">
+                        Enregistrer le paiement
+                      </button>
+                    )}
+                  </span>
+                </div>
+                {d.paid > 0 && d.remaining > 0 && <p className="text-xs text-muted-foreground">Déjà payé : {fmt(d.paid)}</p>}
+                {paying === key && (
+                  <div className="mt-2 flex flex-wrap items-end gap-2 rounded-xl bg-muted/50 p-3">
+                    <label className="text-xs font-semibold">
+                      Montant réellement payé ({base})
+                      <input type="number" step="0.01" className={`${inputCls} mt-1 w-40`} value={amount || ""} onChange={(e) => setAmount(Number(e.target.value))} />
+                    </label>
+                    <label className="text-xs font-semibold">
+                      Date
+                      <input type="date" max={TODAY} className={`${inputCls} mt-1 w-44`} value={date} onChange={(e) => setDate(e.target.value)} />
+                    </label>
+                    <button
+                      onClick={() => {
+                        const errs = actions.addMovement({ id: newId("m"), type: "prelevement", date, accountId, amount, levyLabel: d.levy.label, period: d.period, description: `${d.levy.label} — ${d.periodLabel}` });
+                        setErrors(errs);
+                        if (!errs.length) setPaying(null);
+                      }}
+                      className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                    >
+                      Enregistrer
+                    </button>
+                    <button onClick={() => setPaying(null)} className="px-2 py-2 text-sm">Annuler</button>
+                    {errors.map((e) => <p key={e} className="w-full text-xs text-danger">{e}</p>)}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
   );
 }

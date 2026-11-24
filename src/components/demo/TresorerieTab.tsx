@@ -153,7 +153,7 @@ export function TresorerieTab({ demo }: { demo: Demo }) {
 
         <div className="grid gap-4 sm:grid-cols-3">
           <Card title="Aujourd'hui"><p className="font-num text-2xl">{fmt(f.start)}</p></Card>
-          <Card title="Point le plus bas"><p className={`font-num text-2xl ${f.min && f.min.balance < 0 ? "text-danger" : ""}`}>{f.min ? fmt(f.min.balance) : "—"}</p><p className="text-xs text-muted-foreground">{f.min && formatDateFr(f.min.date)}</p></Card>
+          <Card title="Point le plus bas" help="Le plus petit solde prévu sur la période. On part de votre argent disponible ce matin, puis, jour après jour, on ajoute ce que vos clients doivent payer et on retire ce que vous devez payer, à leurs dates. Il ne peut jamais dépasser votre argent d'aujourd'hui."><p className={`font-num text-2xl ${f.min && f.min.balance < 0 ? "text-danger" : ""}`}>{f.min ? fmt(f.min.balance) : "—"}</p><p className="text-xs text-muted-foreground">{f.min && formatDateFr(f.min.date)}</p></Card>
           <Card title={`Dans ${horizon} jours`}><p className="font-num text-2xl">{fmt(f.end)}</p></Card>
         </div>
 
@@ -187,7 +187,7 @@ export function TresorerieTab({ demo }: { demo: Demo }) {
             </table>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Pour information, le calcul simplifié « solde + à recevoir − à payer » donne {fmt(f.start + f.totals.inflows - f.totals.outflows)}, mais il ne dit pas quand l'argent manque.
+            Si tout était payé et encaissé d'ici là, vous finiriez la période avec {fmt(f.end)}. Ce total final ne montre pas les creux entre-temps : c'est pour cela que le tableau suit les dates, jour après jour.
           </p>
         </Card>
       </div>

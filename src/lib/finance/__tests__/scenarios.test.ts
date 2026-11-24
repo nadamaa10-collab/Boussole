@@ -5,6 +5,7 @@ import {
   breakEven,
   buildDemoData,
   buildEmptyData,
+  levySchedule,
   migrateData,
   recordPayment as record,
   cashFlowStatement,
@@ -432,5 +433,36 @@ describe("Saisie le jour de la configuration", () => {
     expect(cashPosition(old, T).total).toBe(5000);
     expect(cashPosition(migrateData(old), T).total).toBe(5300);
     expect(migrateData(migrateData(old)).accounts[0]!.openingDate).toBe(addDays(T, -1));
+  });
+});
+
+describe("Impôts et cotisations périodiques", () => {
+  const withLevy = (frequency: "mensuelle" | "trimestrielle" | "annuelle", dueDay?: number) =>
+    base({
+      invoices: [inv({ id: "s1", amountHT: 10000, issueDate: "2026-10-15" }), inv({ id: "s2", amountHT: 5000, issueDate: "2026-11-10" })],
+      settings: { ...base().settings, levies: [{ label: "Cotisations", rate: 0.02, base: "chiffre_affaires", validFrom: "2026-01-01", source: "test", frequency, dueDay }] },
+    });
+
+  it("trimestriel : une échéance pour le trimestre, le mois qui suit, au jour choisi", () => {
+    const due = levySchedule(withLevy("trimestrielle", 15), T, "2027-06-30", T);
+    expect(due.map((d) => [d.period, d.dueDate, d.amount])).toEqual([["2026-T4", "2027-01-15", 300]]);
+  });
+
+  it("mensuel : une échéance par mois ; un mois sans CA ne crée rien", () => {
+    const due = levySchedule(withLevy("mensuelle"), "2026-11-01", "2026-12-31", T);
+    expect(due.map((d) => [d.period, d.dueDate, d.amount, d.provisional])).toEqual([
+      ["2026-10", "2026-11-30", 200, false],
+      ["2026-11", "2026-12-31", 100, true],
+    ]);
+  });
+
+  it("une échéance passée non payée est due aujourd'hui ; une fois payée, elle sort des prévisions et réduit le solde", () => {
+    const data = withLevy("mensuelle", 10);
+    const f = forecast(data, { today: T, days: 10 });
+    expect(f.events.map((e) => [e.date, e.amount, e.status])).toEqual([[T, -200, "en_retard"]]);
+    const paid = { ...data, movements: [{ id: "m", type: "prelevement" as const, date: T, accountId: "a", amount: 200, levyLabel: "Cotisations", period: "2026-10" }] };
+    expect(forecast(paid, { today: T, days: 10 }).events).toHaveLength(0);
+    expect(cashPosition(paid, T).total).toBe(4800);
+    expect(profitability(paid, "2026-10-01", "2026-10-31").charges).toBe(0);
   });
 });

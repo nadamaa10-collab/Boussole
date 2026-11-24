@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, BellRing, CalendarClock, PiggyBank, Repeat, TrendingDown, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, BellRing, CalendarClock, Landmark, PiggyBank, Repeat, TrendingDown, Wallet } from "lucide-react";
 import {
   cashPosition,
   commitments,
@@ -22,6 +22,7 @@ const ICONS = {
   budget: PiggyBank,
   depense_inhabituelle: AlertTriangle,
   charge_a_confirmer: Repeat,
+  impot: Landmark,
 };
 
 export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string) => void; onAdd: () => void }) {
@@ -166,6 +167,16 @@ export function HomeTab({ demo, goTo, onAdd }: { demo: Demo; goTo: (tab: string)
                           Oui, c'est fait
                         </button>
                         <button onClick={() => goTo("recurrences")} className="rounded-full border border-border px-3 py-1 text-xs font-semibold">Modifier</button>
+                      </span>
+                    )}
+                    {a.levy && (
+                      <span className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => act.addMovement({ id: newId("m"), type: "prelevement", date: TODAY, accountId: data.accounts.find((x) => x.currency === base)?.id ?? data.accounts[0]!.id, amount: a.levy!.amount, levyLabel: a.levy!.label, period: a.levy!.period, description: `${a.levy!.label} — ${a.levy!.period}` })}
+                          className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+                        >
+                          Oui, payé ({fmt(a.levy.amount)})
+                        </button>
                       </span>
                     )}
                     {a.targetId && (a.kind === "relance" || a.kind === "fournisseur" || a.kind === "echeance_client") && (

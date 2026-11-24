@@ -40,3 +40,7 @@ body { @apply bg-background font-sans text-foreground antialiased; }
 
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* Champs de date : sur iPad/iPhone, Safari leur donne une largeur fixe qui déborde des colonnes. */
+input[type="date"] { min-width: 0; max-width: 100%; display: block; -webkit-appearance: none; appearance: none; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }

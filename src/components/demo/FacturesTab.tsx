@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { InvoiceForm } from "./AddSheet";
-import { commitments, economicQuote, formatDateFr, invoiceState, type Confidence, type Invoice } from "@/lib/finance";
+import { commitments, economicQuote, formatDateFr, invoiceState, type Confidence, type Invoice, type Payment } from "@/lib/finance";
 import type { Demo } from "./store";
 import { TODAY, newId } from "./store";
-import { Badge, Card, Empty, Errors, Field, PrimaryButton, Row, Segmented, Sheet, inputCls, type BadgeTone } from "./ui";
+import { CONFIDENCE_HELP, Badge, Card, Empty, Errors, Field, PrimaryButton, Row, Segmented, Sheet, inputCls, type BadgeTone } from "./ui";
 
 export function statusTone(inv: Invoice, data: Demo["data"]): BadgeTone {
   const st = invoiceState(inv, data.payments, TODAY);
@@ -19,6 +19,7 @@ export function FacturesTab({ demo }: { demo: Demo }) {
   const { data, fmt } = demo;
   const [kind, setKind] = useState<"client" | "fournisseur">("client");
   const [filter, setFilter] = useState<"ouvertes" | "payees" | "toutes">("toutes");
+  const [cat, setCat] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const c = commitments(data, TODAY);
   const totals = kind === "client" ? c.receivables : c.payables;
@@ -26,6 +27,7 @@ export function FacturesTab({ demo }: { demo: Demo }) {
     .filter((i) => i.kind === kind)
     .map((i) => ({ inv: i, st: invoiceState(i, data.payments, TODAY, data.settings.locale) }))
     .filter(({ st }) => filter === "toutes" || (filter === "ouvertes" ? st.remaining > 0 : st.remaining <= 0))
+    .filter(({ inv }) => !cat || inv.category === cat)
     .sort((a, b) => (a.st.remaining > 0 ? 0 : 1) - (b.st.remaining > 0 ? 0 : 1) || a.inv.dueDate.localeCompare(b.inv.dueDate));
   const open = data.invoices.find((i) => i.id === openId);
 
@@ -33,8 +35,19 @@ export function FacturesTab({ demo }: { demo: Demo }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Segmented label="Type" value={kind} onChange={setKind} options={[{ value: "client", label: "Recettes (clients)" }, { value: "fournisseur", label: "Dépenses" }]} />
-        <Segmented label="Filtre" value={filter} onChange={setFilter} options={[{ value: "toutes", label: "Toutes" }, { value: "ouvertes", label: "À régler" }, { value: "payees", label: "Payées" }]} />
+        <div className="flex flex-wrap items-center gap-2">
+          <select className={`${inputCls} w-auto py-1.5 text-sm`} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Catégorie">
+            <option value="">Toutes les catégories</option>
+            {[...new Set(data.invoices.filter((i) => i.kind === kind).map((i) => i.category))].sort().map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <Segmented label="Filtre" value={filter} onChange={setFilter} options={[{ value: "toutes", label: "Toutes" }, { value: "ouvertes", label: "À régler" }, { value: "payees", label: "Payées" }]} />
+        </div>
       </div>
+      {cat && (
+        <p className="text-sm text-muted-foreground">
+          {list.length} {kind === "client" ? "facture(s)" : "dépense(s)"} en « {cat} » · total {fmt(list.filter((x) => x.inv.currency === demo.base).reduce((s, x) => s + x.st.total, 0))}{list.some((x) => x.inv.currency !== demo.base) ? " hors factures en devise étrangère" : ""}
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Card title={kind === "client" ? "À recevoir" : "À payer"} help="Somme des restes dus uniquement : une facture payée en partie ne compte que pour ce qui manque.">
           <p className="font-num text-3xl">{totals.total === null ? "—" : fmt(totals.total)}</p>
@@ -79,6 +92,7 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmPay, setConfirmPay] = useState<string | null>(null);
+  const [editPay, setEditPay] = useState<string | null>(null);
   const [unpay, setUnpay] = useState(false);
   const [unpayDue, setUnpayDue] = useState(inv.dueDate);
   const st = invoiceState(inv, data.payments, TODAY, data.settings.locale);
@@ -175,6 +189,7 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
           <ul className="divide-y divide-border rounded-2xl bg-card px-4">
             {st.payments.map((p) => {
               const acc = accounts.find((a) => a.id === p.accountId);
+              if (editPay === p.id) return <PaymentEditor key={p.id} demo={demo} inv={inv} payment={p} done={() => setEditPay(null)} />;
               return (
                 <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                   <span>{formatDateFr(p.date)} · {acc?.name}</span>
@@ -183,6 +198,9 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
                       {fmt(p.amount, acc?.currency ?? inv.currency)}
                       {p.settledAmount !== undefined && acc?.currency !== inv.currency && <span className="block text-xs text-muted-foreground">pour {fmt(p.settledAmount, inv.currency)}</span>}
                     </span>
+                    <button onClick={() => setEditPay(p.id)} aria-label="Modifier ce paiement" title="Modifier le compte, la date ou le montant" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted">
+                      <Pencil className="size-4" />
+                    </button>
                     {confirmPay === p.id ? (
                       <button onClick={() => { actions.deletePayment(p.id); setConfirmPay(null); }} className="rounded-full bg-danger px-2.5 py-1 text-xs font-semibold text-white">Confirmer</button>
                     ) : (
@@ -243,7 +261,7 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
             </Field>
           </div>
           {inv.kind === "client" && (
-            <Field label="Ce paiement est…">
+            <Field label="Fiabilité du paiement" hint={CONFIDENCE_HELP[confidence]}>
               <Segmented label="Fiabilité" value={confidence} onChange={setConfidence} options={[{ value: "confirme", label: "Confirmé" }, { value: "probable", label: "Probable" }, { value: "incertain", label: "Incertain" }]} />
             </Field>
           )}
@@ -267,5 +285,49 @@ export function InvoiceDetail({ demo, inv, onClose }: { demo: Demo; inv: Invoice
         )}
       </div>
     </div>
+  );
+}
+
+/** Modifier un paiement déjà enregistré : compte (ex. banque → caisse), date ou montant. */
+function PaymentEditor({ demo, inv, payment, done }: { demo: Demo; inv: Invoice; payment: Payment; done: () => void }) {
+  const { data, actions } = demo;
+  const [accountId, setAccountId] = useState(payment.accountId);
+  const [date, setDate] = useState(payment.date);
+  const [amount, setAmount] = useState(payment.amount);
+  const [settled, setSettled] = useState(payment.settledAmount ?? payment.amount);
+  const [errors, setErrors] = useState<string[]>([]);
+  const account = data.accounts.find((a) => a.id === accountId)!;
+  const same = account.currency === inv.currency;
+  const save = () => {
+    const errs = actions.addPayment({ ...payment, accountId, date, amount, settledAmount: same ? undefined : settled });
+    setErrors(errs);
+    if (!errs.length) done();
+  };
+  return (
+    <li className="space-y-2 py-3 text-sm">
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Compte">
+          <select className={inputCls} value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            {data.accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+          </select>
+        </Field>
+        <Field label="Date">
+          <input type="date" max={TODAY} className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label={`Montant (${account.currency})`}>
+          <input type="number" step="0.01" className={inputCls} value={amount || ""} onChange={(e) => { setAmount(Number(e.target.value)); if (same) setSettled(Number(e.target.value)); }} />
+        </Field>
+        {!same && (
+          <Field label={`Soldé sur la facture (${inv.currency})`}>
+            <input type="number" step="0.01" className={inputCls} value={settled || ""} onChange={(e) => setSettled(Number(e.target.value))} />
+          </Field>
+        )}
+      </div>
+      <Errors list={errors} />
+      <div className="flex gap-2">
+        <button onClick={save} className="rounded-full bg-primary px-4 py-2 font-semibold text-primary-foreground">Enregistrer</button>
+        <button onClick={done} className="rounded-full px-4 py-2 font-semibold">Annuler</button>
+      </div>
+    </li>
   );
 }

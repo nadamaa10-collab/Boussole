@@ -126,13 +126,20 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="mb-1 block text-sm font-semibold">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
     </label>
   );
 }
+
+/** Ce que veut dire la fiabilité d'un paiement attendu. */
+export const CONFIDENCE_HELP: Record<"confirme" | "probable" | "incertain", string> = {
+  confirme: "Confirmé : le client s'est engagé sur cette date (virement programmé, accord écrit).",
+  probable: "Probable : vous pensez être payé à la date prévue, sans engagement ferme. C'est le choix par défaut.",
+  incertain: "Incertain : retard ou impayé possible. Dans le scénario « Prudent », ce paiement est décalé de 30 jours.",
+};
 
 export const inputCls =
   "w-full rounded-xl border border-border bg-card px-3 py-2.5 text-base outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20";
@@ -158,4 +165,67 @@ export function PrimaryButton({ children, ...rest }: React.ButtonHTMLAttributes<
 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">{children}</p>;
+}
+
+/**
+ * Menu déroulant de catégories, avec « Nouvelle catégorie… » pour en créer une.
+ * La nouvelle catégorie est enregistrée et proposée ensuite partout.
+ */
+export function CategorySelect({
+  value,
+  onChange,
+  options,
+  onCreate,
+  id,
+  required,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  onCreate: (name: string) => void;
+  id?: string;
+  required?: boolean;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const list = value && !options.includes(value) ? [...options, value] : options;
+  if (creating) {
+    const ok = () => {
+      const n = name.trim();
+      if (!n) return;
+      onCreate(n);
+      onChange(n);
+      setCreating(false);
+      setName("");
+    };
+    return (
+      <div className="flex gap-2">
+        <input
+          autoFocus
+          id={id}
+          className={inputCls}
+          placeholder="Nom de la nouvelle catégorie"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), ok())}
+        />
+        <button type="button" onClick={ok} className="rounded-xl bg-primary px-4 font-semibold text-primary-foreground">OK</button>
+        <button type="button" onClick={() => setCreating(false)} className="px-2 text-sm text-muted-foreground">Annuler</button>
+      </div>
+    );
+  }
+  return (
+    <select
+      id={id}
+      className={inputCls}
+      value={value}
+      onChange={(e) => (e.target.value === "__new__" ? setCreating(true) : onChange(e.target.value))}
+    >
+      {!value && <option value="">{required ? "Choisir une catégorie (obligatoire)…" : "Choisir une catégorie…"}</option>}
+      {list.map((c) => (
+        <option key={c} value={c}>{c}</option>
+      ))}
+      <option value="__new__">＋ Nouvelle catégorie…</option>
+    </select>
+  );
 }

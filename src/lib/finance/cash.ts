@@ -46,6 +46,7 @@ export function cashFlows(data: FinanceData): CashFlow[] {
         flows.push({ accountId: m.accountId, date: m.date, amount: -m.amount, kind: "financement", label, sourceId: m.id });
         break;
       case "frais_bancaires":
+      case "prelevement":
         flows.push({ accountId: m.accountId, date: m.date, amount: -m.amount, kind: "exploitation", label, sourceId: m.id });
         break;
       case "transfert":

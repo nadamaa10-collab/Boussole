@@ -291,12 +291,21 @@ export function useDemo(data: FinanceData, setData: (d: FinanceData) => void, cl
       updateSettings(change: Partial<FinanceData["settings"]>) {
         setData({ ...data, settings: { ...data.settings, ...change } });
       },
+      addCategory(kind: "depense" | "recette", name: string) {
+        const c = data.settings.customCategories ?? { depense: [], recette: [] };
+        if (c[kind].some((x) => x.toLocaleLowerCase("fr") === name.toLocaleLowerCase("fr"))) return;
+        setData({ ...data, settings: { ...data.settings, customCategories: { ...c, [kind]: [...c[kind], name] } } });
+      },
       addLevy(l: Levy) {
         setData({ ...data, settings: { ...data.settings, levies: [...data.settings.levies, l] } });
         notify("Prélèvement ajouté.");
       },
       removeLevy(label: string) {
         setData({ ...data, settings: { ...data.settings, levies: data.settings.levies.filter((l) => l.label !== label) } });
+      },
+      updateAccount(id: string, change: Partial<Account>) {
+        setData({ ...data, accounts: data.accounts.map((a) => (a.id === id ? { ...a, ...change } : a)) });
+        notify("Compte mis à jour : tous les calculs repartent de ce solde.");
       },
       addAccount(a: Account, rates: FxRate[] = []) {
         setData({ ...data, accounts: [...data.accounts, a], rates: [...data.rates, ...rates] });
